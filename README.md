@@ -12,10 +12,11 @@ docker-compose up --build
 ```
 will build and start the gateway in a docker container
 
-3. 
+3. In a separate terminal
 ```
-ssh -o testuser@localhost -p 8022
+go run internal/proxy/proxy.go
 ```
-Will open an ssh channel to the gateway that will reply back with what you type. The password is hardcoded as `tiger`
+which will open an http server on port 8085
 
+4. In another terminal `curl localhost:8085` will respond with "hello world"
 
