@@ -1,17 +1,15 @@
-package proxy
+//package proxy
+package main
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
-	"os"
-	"syscall"
 	"time"
 
+	"github.com/mihai-chiorean/cerberus/internal/proxy"
 	"github.com/rs/zerolog"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
@@ -22,86 +20,11 @@ import (
 type Config struct{}
 
 // Proxy -
-type Proxy struct {
-	srv  *http.Server
-	done chan os.Signal
-	log  *zap.SugaredLogger
-}
+type Proxy struct{}
 
 // NewProxy -
 func NewProxy() *Proxy {
 	return nil
-}
-
-// NewHTTPProxy starts a new proxy
-func NewHTTPProxy(hostport string, remote string, conn *ssh.Client, logger *zap.SugaredLogger) *Proxy {
-	// downstream connection
-	cli := http.Client{
-		Transport: http.RoundTripper(&http.Transport{
-			Dial: func(n string, addr string) (net.Conn, error) {
-				logger.Infow("Dialing...", "addr", addr)
-				newChannel, err := conn.Dial("tcp", addr)
-				if err != nil {
-					return nil, err
-				}
-				logger.Infow("Have tcp connection", "remote", newChannel.RemoteAddr().String())
-
-				return newChannel, nil
-			},
-		}),
-	}
-
-	srv := http.Server{
-		Addr: hostport,
-		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			logger.Info("Request received")
-			res, err := cli.Get("http://" + remote)
-			if err != nil {
-				logger.Error(err)
-				fmt.Fprintf(resp, "Fail!\n")
-				return
-			}
-			logger.Info("Request proxied")
-			body, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				logger.Error(err)
-				fmt.Fprintf(resp, "Fail!\n")
-				return
-			}
-			logger.Info("money!")
-			logger.Info(string(body))
-			fmt.Fprintf(resp, "Hello world!\n")
-		}),
-	}
-	p := Proxy{
-		srv:  &srv,
-		done: make(chan os.Signal, 1),
-		log:  logger,
-	}
-
-	return &p
-}
-
-// Start starts the http listener
-func (p *Proxy) Start() {
-
-	go func() {
-		// listener
-		if err := p.srv.ListenAndServe(); err != nil {
-			p.log.Fatal(err)
-		}
-	}()
-	<-p.done
-
-	p.log.Info("Shutting down proxy")
-	if err := p.srv.Shutdown(context.Background()); err != nil {
-		p.log.Error(err)
-	}
-}
-
-// Stop stops the http proxy
-func (p *Proxy) Stop() {
-	p.done <- syscall.SIGSTOP
 }
 
 func sshclient(logger *zap.SugaredLogger) {
@@ -157,21 +80,6 @@ func sshclient(logger *zap.SugaredLogger) {
 
 	logger.Info(string(payload))
 
-	cli := http.Client{
-		Transport: http.RoundTripper(&http.Transport{
-			Dial: func(n string, addr string) (net.Conn, error) {
-				logger.Infow("Dialing...", "addr", addr)
-				newChannel, err := conn.Dial("tcp", addr)
-				if err != nil {
-					return nil, err
-				}
-				logger.Infow("Have tcp connection", "remote", newChannel.RemoteAddr().String())
-
-				return newChannel, nil
-			},
-		}),
-	}
-
 	// Request the remote side to open port 8080 on all interfaces.
 	//l, err := conn.Listen("tcp", ":8085")
 	//if err != nil {
@@ -180,27 +88,8 @@ func sshclient(logger *zap.SugaredLogger) {
 	//defer l.Close()
 	//logger.Info("Listening tcp on ", l.Addr().String())
 	// Serve HTTP with your SSH server acting as a reverse proxy.
-	if err := http.ListenAndServe(":8085", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		logger.Info("Request received")
-		res, err := cli.Get("http://" + string(payload))
-		if err != nil {
-			logger.Error(err)
-			fmt.Fprintf(resp, "Fail!\n")
-			return
-		}
-		logger.Info("Request proxied")
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			logger.Error(err)
-			fmt.Fprintf(resp, "Fail!\n")
-			return
-		}
-		logger.Info("money!")
-		logger.Info(string(body))
-		fmt.Fprintf(resp, "Hello world!\n")
-	})); err != nil {
-		log.Fatal(err)
-	}
+	p := proxy.NewHTTPProxy(":8085", string(payload), conn, logger)
+	p.Start()
 }
 
 func madTCPProxyThing() {
