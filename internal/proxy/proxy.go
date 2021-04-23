@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"go.uber.org/zap"
-	"golang.org/x/crypto/ssh"
 )
 
 // Config -
@@ -23,27 +22,19 @@ type Proxy struct {
 	log  *zap.SugaredLogger
 }
 
-// NewProxy -
-func NewProxy() *Proxy {
-	return nil
-}
+// Dialer is the downstream dialer function
+type Dialer func(n string, addr string) (net.Conn, error)
 
 // NewHTTPProxy starts a new proxy
-func NewHTTPProxy(hostport string, remote string, conn *ssh.Client, logger *zap.SugaredLogger) *Proxy {
+func NewHTTPProxy(hostport string, remote string, dialer Dialer, logger *zap.SugaredLogger) *Proxy {
 	// downstream connection
-	cli := http.Client{
-		Transport: http.RoundTripper(&http.Transport{
-			Dial: func(n string, addr string) (net.Conn, error) {
-				logger.Infow("Dialing...", "addr", addr)
-				newChannel, err := conn.Dial("tcp", addr)
-				if err != nil {
-					return nil, err
-				}
-				logger.Infow("Have tcp connection", "remote", newChannel.RemoteAddr().String())
+	t := &http.Transport{}
+	if dialer != nil {
+		t.Dial = dialer
+	}
 
-				return newChannel, nil
-			},
-		}),
+	cli := http.Client{
+		Transport: http.RoundTripper(t),
 	}
 
 	srv := http.Server{
@@ -95,4 +86,9 @@ func (p *Proxy) Start() {
 // Stop stops the http proxy
 func (p *Proxy) Stop() {
 	p.done <- syscall.SIGSTOP
+}
+
+// ListenerHost gets the server addr
+func (p *Proxy) ListenerHost() string {
+	return p.srv.Addr
 }
