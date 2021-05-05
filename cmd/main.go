@@ -3,12 +3,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"time"
 
+	"github.com/mihai-chiorean/cerberus/cmd/logging"
+	"github.com/mihai-chiorean/cerberus/gateway/api"
 	"github.com/mihai-chiorean/cerberus/internal/proxy"
 	"github.com/rs/zerolog"
 	"go.uber.org/zap"
@@ -25,6 +28,36 @@ type Proxy struct{}
 // NewProxy -
 func NewProxy() *Proxy {
 	return nil
+}
+
+func newGatewayLogListener(logger *zap.SugaredLogger) (string, error) {
+	//log := logger.Named("GATEWAY")
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return "", err
+	}
+
+	// TODO add don channel
+	go func() {
+		defer l.Close()
+		for {
+			// Wait for a connection.
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+			// Handle the connection in a new goroutine.
+			// The loop then returns to accepting, so that
+			// multiple connections may be served concurrently.
+			go func(c net.Conn) {
+				// Echo all incoming data.
+				io.Copy(c, c)
+				// Shut down the connection.
+				c.Close()
+			}(conn)
+		}
+	}()
+	return l.Addr().String(), nil
 }
 
 func sshclient(logger *zap.SugaredLogger) {
@@ -57,10 +90,49 @@ func sshclient(logger *zap.SugaredLogger) {
 	//	cli := http.Client{
 	//		Transport: t,
 	//	}
-	_, payload, err := conn.SendRequest("Handshake", true, []byte(`duude!`))
+	//addr, _ := newGatewayLogListener(logger)
+	handshake := api.HandshakeRequest{
+		LoggerAddr: ":0",
+	}
+	// TODO handle error
+	body, _ := json.Marshal(&handshake)
+	_, payload, err := conn.SendRequest("Handshake", true, body)
 	if err != nil {
 		logger.Fatal(err)
 	}
+	var handshakeRes api.Handshake
+	if err := json.Unmarshal(payload, &handshakeRes); err != nil {
+		logger.Fatal(err)
+	}
+	logger.Info("Handshake received", "payload", handshakeRes)
+
+	newChannel, err := conn.Dial("tcp", handshakeRes.LoggerListener)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	logger.Infow("Have tcp connection for logger", "remote", newChannel.RemoteAddr().String())
+	go func(l *logging.Receiver) {
+		//rawEntry := json.NewDecoder(newChannel)
+		//io.Copy(os.Stderr, newChannel)
+		//for {
+		//var entry zapcore.Entry
+		//	var entry map[string]interface{}
+		//	if err := rawEntry.Decode(&entry); err == io.EOF {
+		//		logger.Error(err)
+		//		break
+		//	} else if err != nil {
+		//		logger.Error(err)
+		//	}
+		//	data, _ := json.Marshal(entry)
+		//	fmt.Println(string(data))
+		//var cEntry zapcore.CheckedEntry
+		//fmt.Printf("%v\n", cEntry.Entry)
+		//core.Check(entry, &cEntry).Write()
+		//cEntry.Write()
+		//core.Write(entry, []zapcore.Field{})
+		//}
+		l.Decode(newChannel)
+	}(&logging.Receiver{L: logger.Named("GATEWAY")})
 
 	_, payload, err = conn.SendRequest("NewHTTPProxy", true, []byte(`duude!`))
 	if err != nil {
@@ -156,7 +228,7 @@ func madTCPProxyThing() {
 }
 
 func main() {
-	lp, _ := zap.NewProduction()
+	lp, _ := zap.NewDevelopment()
 	logger := lp.Sugar()
 	defer logger.Sync()
 	sshclient(logger)
