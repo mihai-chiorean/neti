@@ -30,6 +30,11 @@ func NewProxy() *Proxy {
 	return nil
 }
 
+type logDecoder interface {
+	Decode(in io.Reader)
+	Log([]byte)
+}
+
 func newGatewayLogListener(logger *zap.SugaredLogger) (string, error) {
 	//log := logger.Named("GATEWAY")
 	l, err := net.Listen("tcp", ":0")
@@ -111,7 +116,7 @@ func sshclient(logger *zap.SugaredLogger) {
 		logger.Fatal(err)
 	}
 	logger.Infow("Have tcp connection for logger", "remote", newChannel.RemoteAddr().String())
-	go func(l *logging.Receiver) {
+	go func(l logDecoder) {
 		//rawEntry := json.NewDecoder(newChannel)
 		//io.Copy(os.Stderr, newChannel)
 		//for {
@@ -132,7 +137,7 @@ func sshclient(logger *zap.SugaredLogger) {
 		//core.Write(entry, []zapcore.Field{})
 		//}
 		l.Decode(newChannel)
-	}(&logging.Receiver{L: logger.Named("GATEWAY")})
+	}(logging.NewLogReceiver(logger.Desugar().Named("GATEWAY")))
 
 	_, payload, err = conn.SendRequest("NewHTTPProxy", true, []byte(`duude!`))
 	if err != nil {

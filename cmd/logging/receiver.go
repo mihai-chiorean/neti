@@ -146,7 +146,18 @@ func (e *entry) zapEntry() zapcore.Entry {
 
 // Receiver -
 type Receiver struct {
-	L *zap.SugaredLogger
+	L  *zap.Logger
+	rl *zap.Logger
+}
+
+// NewLogReceiver -
+func NewLogReceiver(l *zap.Logger) *Receiver {
+	r := &Receiver{
+		L:  l,
+		rl: l.Named("receiver"),
+	}
+
+	return r
 }
 
 // Decode -
@@ -156,38 +167,38 @@ func (r *Receiver) Decode(in io.Reader) {
 	for {
 		var e entry
 		if err := rawEntry.Decode(&e); err == io.EOF {
-			r.L.Error(err)
 			break
 		} else if err != nil {
-			r.L.Error(err)
+			r.rl.Error("Unexpected error with log from gateway", zap.Error(err))
 		}
-		ze := e.zapEntry()
-		args := []interface{}{}
-		for k, v := range e.fields {
-			args = append(args, k, v)
-		}
-		fields, _ := sweetenFields(args)
-		if err := r.L.Desugar().Core().Write(ze, fields); err != nil {
-			r.L.Named("GATEWAY+LOG_RECEIVER").Errorw("Failed to output log", "error", err)
-		}
+		r.log(e)
 	}
 }
 
-func (r *Receiver) log(raw []byte) {
-	var e entry
-	if err := json.Unmarshal(raw, &e); err != nil {
-		r.L.Error("Failed to parse log", "error", err)
-	}
-	//fmt.Printf("%+v\n", e)
+func (r *Receiver) log(e entry) {
 	ze := e.zapEntry()
 	args := []interface{}{}
 	for k, v := range e.fields {
 		args = append(args, k, v)
 	}
-	fields, _ := sweetenFields(args)
-	if err := r.L.Desugar().Core().Write(ze, fields); err != nil {
-		r.L.Named("GATEWAY+LOG_RECEIVER").Errorw("Failed to output log", "error", err)
+	fields, err := sweetenFields(args)
+	if err != nil {
+		r.rl.Error("Unexpected error processing log fields", zap.Error(err))
 	}
+
+	if err := r.L.Core().Write(ze, fields); err != nil {
+		r.rl.Error("Failed to output log", zap.Error(err))
+	}
+}
+
+// Log -
+func (r *Receiver) Log(raw []byte) {
+	var e entry
+	if err := json.Unmarshal(raw, &e); err != nil {
+		r.rl.Error("Failed to parse log", zap.Error(err))
+	}
+
+	r.log(e)
 }
 
 func sweetenFields(args []interface{}) ([]zap.Field, error) {

@@ -26,7 +26,6 @@ type Server struct {
 
 // NewServer creates a gateway server
 func NewServer(log *zap.SugaredLogger) (*Server, error) {
-
 	config := &ssh.ServerConfig{
 		// Remove to disable password auth.
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
@@ -74,6 +73,7 @@ func NewServer(log *zap.SugaredLogger) (*Server, error) {
 	return &server, nil
 }
 
+// routeRequests is a "dumb" router for ssh.Requests
 func (s *Server) routeRequests(in <-chan *ssh.Request) {
 	logger := s.log
 	for req := range in {
@@ -93,6 +93,11 @@ func (s *Server) routeRequests(in <-chan *ssh.Request) {
 	}
 }
 
+// handshake is the initial call the client makes to the gateway
+// ideally we'd do some authorization here.
+//
+// currently it opens a tcp connection used for the gateway to send
+// logs to the client
 func (s *Server) handshake(req *ssh.Request) {
 	h := api.Handshake{
 		Success: "yeahhh",
