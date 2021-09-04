@@ -66,11 +66,13 @@ func newGatewayLogListener(logger *zap.SugaredLogger) (string, error) {
 }
 
 func sshclient(logger *zap.SugaredLogger) {
+	// the ssh client config needs a way to lookup known hosts{
 	hostKeyCallback, err := knownhosts.New("/Users/mihaichiorean/.ssh/known_hosts")
 	if err != nil {
 		logger.Fatal(err)
 	}
 
+	// TODO we need to make this work with a public key, not a password
 	//var hostKey ssh.PublicKey
 	config := &ssh.ClientConfig{
 		User: "testuser",
@@ -101,44 +103,33 @@ func sshclient(logger *zap.SugaredLogger) {
 	}
 	// TODO handle error
 	body, _ := json.Marshal(&handshake)
+
+	// this is an "ssh request"; the body will likely expand with other things
+	// TODO we need these api names - like Handshake - in some static form
 	_, payload, err := conn.SendRequest("Handshake", true, body)
 	if err != nil {
 		logger.Fatal(err)
 	}
+	// this is the handshake response; it will expose the port logs come on
 	var handshakeRes api.Handshake
 	if err := json.Unmarshal(payload, &handshakeRes); err != nil {
 		logger.Fatal(err)
 	}
 	logger.Info("Handshake received", "payload", handshakeRes)
 
+	// Dial the log listener port to get gateway logs
 	newChannel, err := conn.Dial("tcp", handshakeRes.LoggerListener)
 	if err != nil {
 		logger.Fatal(err)
 	}
 	logger.Infow("Have tcp connection for logger", "remote", newChannel.RemoteAddr().String())
+
+	// adding a new reveiver for the logger. This is going to read and decode logs from the gateway
 	go func(l logDecoder) {
-		//rawEntry := json.NewDecoder(newChannel)
-		//io.Copy(os.Stderr, newChannel)
-		//for {
-		//var entry zapcore.Entry
-		//	var entry map[string]interface{}
-		//	if err := rawEntry.Decode(&entry); err == io.EOF {
-		//		logger.Error(err)
-		//		break
-		//	} else if err != nil {
-		//		logger.Error(err)
-		//	}
-		//	data, _ := json.Marshal(entry)
-		//	fmt.Println(string(data))
-		//var cEntry zapcore.CheckedEntry
-		//fmt.Printf("%v\n", cEntry.Entry)
-		//core.Check(entry, &cEntry).Write()
-		//cEntry.Write()
-		//core.Write(entry, []zapcore.Field{})
-		//}
 		l.Decode(newChannel)
 	}(logging.NewLogReceiver(logger.Desugar().Named("GATEWAY")))
 
+	// this is another api that the gateway provides. At the moment there is no payload schema for it
 	_, payload, err = conn.SendRequest("NewHTTPProxy", true, []byte(`duude!`))
 	if err != nil {
 		logger.Fatal(err)
@@ -164,7 +155,9 @@ func sshclient(logger *zap.SugaredLogger) {
 	//}
 	//defer l.Close()
 	//logger.Info("Listening tcp on ", l.Addr().String())
+
 	// Serve HTTP with your SSH server acting as a reverse proxy.
+	// payload has the hostport
 	p := proxy.NewHTTPProxy(":8085", string(payload), proxy.Dialer(func(n string, addr string) (net.Conn, error) {
 		logger.Infow("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
