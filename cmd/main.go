@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/mihai-chiorean/cerberus/cmd/logging"
@@ -66,8 +67,12 @@ func newGatewayLogListener(logger *zap.SugaredLogger) (string, error) {
 }
 
 func sshclient(logger *zap.SugaredLogger) {
-	// the ssh client config needs a way to lookup known hosts{
-	hostKeyCallback, err := knownhosts.New("/Users/mihaichiorean/.ssh/known_hosts")
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	hostKeyCallback, err := knownhosts.New(fmt.Sprintf("%s/.ssh/known_hosts", homedir))
 	if err != nil {
 		logger.Fatal(err)
 	}
