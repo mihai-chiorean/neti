@@ -26,7 +26,8 @@ type Proxy struct {
 type Dialer func(n string, addr string) (net.Conn, error)
 
 // NewHTTPProxy starts a new proxy
-func NewHTTPProxy(hostport string, remote string, dialer Dialer, logger *zap.SugaredLogger) *Proxy {
+func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.SugaredLogger) *Proxy {
+	logger := log.Named("HTTPProxy")
 	// downstream connection
 	t := &http.Transport{}
 	if dialer != nil {

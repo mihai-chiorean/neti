@@ -3,12 +3,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"time"
 
+	"github.com/mihai-chiorean/cerberus/cmd/logging"
+	"github.com/mihai-chiorean/cerberus/gateway/api"
 	"github.com/mihai-chiorean/cerberus/internal/proxy"
 	"github.com/rs/zerolog"
 	"go.uber.org/zap"
@@ -27,12 +30,49 @@ func NewProxy() *Proxy {
 	return nil
 }
 
+type logDecoder interface {
+	Decode(in io.Reader)
+	Log([]byte)
+}
+
+func newGatewayLogListener(logger *zap.SugaredLogger) (string, error) {
+	//log := logger.Named("GATEWAY")
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return "", err
+	}
+
+	// TODO add don channel
+	go func() {
+		defer l.Close()
+		for {
+			// Wait for a connection.
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+			// Handle the connection in a new goroutine.
+			// The loop then returns to accepting, so that
+			// multiple connections may be served concurrently.
+			go func(c net.Conn) {
+				// Echo all incoming data.
+				io.Copy(c, c)
+				// Shut down the connection.
+				c.Close()
+			}(conn)
+		}
+	}()
+	return l.Addr().String(), nil
+}
+
 func sshclient(logger *zap.SugaredLogger) {
+	// the ssh client config needs a way to lookup known hosts{
 	hostKeyCallback, err := knownhosts.New("/Users/mihaichiorean/.ssh/known_hosts")
 	if err != nil {
 		logger.Fatal(err)
 	}
 
+	// TODO we need to make this work with a public key, not a password
 	//var hostKey ssh.PublicKey
 	config := &ssh.ClientConfig{
 		User: "testuser",
@@ -57,11 +97,39 @@ func sshclient(logger *zap.SugaredLogger) {
 	//	cli := http.Client{
 	//		Transport: t,
 	//	}
-	_, payload, err := conn.SendRequest("Handshake", true, []byte(`duude!`))
+	//addr, _ := newGatewayLogListener(logger)
+	handshake := api.HandshakeRequest{
+		LoggerAddr: ":0",
+	}
+	// TODO handle error
+	body, _ := json.Marshal(&handshake)
+
+	// this is an "ssh request"; the body will likely expand with other things
+	// TODO we need these api names - like Handshake - in some static form
+	_, payload, err := conn.SendRequest("Handshake", true, body)
 	if err != nil {
 		logger.Fatal(err)
 	}
+	// this is the handshake response; it will expose the port logs come on
+	var handshakeRes api.Handshake
+	if err := json.Unmarshal(payload, &handshakeRes); err != nil {
+		logger.Fatal(err)
+	}
+	logger.Info("Handshake received", "payload", handshakeRes)
 
+	// Dial the log listener port to get gateway logs
+	newChannel, err := conn.Dial("tcp", handshakeRes.LoggerListener)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	logger.Infow("Have tcp connection for logger", "remote", newChannel.RemoteAddr().String())
+
+	// adding a new reveiver for the logger. This is going to read and decode logs from the gateway
+	go func(l logDecoder) {
+		l.Decode(newChannel)
+	}(logging.NewLogReceiver(logger.Desugar().Named("GATEWAY")))
+
+	// this is another api that the gateway provides. At the moment there is no payload schema for it
 	_, payload, err = conn.SendRequest("NewHTTPProxy", true, []byte(`duude!`))
 	if err != nil {
 		logger.Fatal(err)
@@ -87,7 +155,9 @@ func sshclient(logger *zap.SugaredLogger) {
 	//}
 	//defer l.Close()
 	//logger.Info("Listening tcp on ", l.Addr().String())
+
 	// Serve HTTP with your SSH server acting as a reverse proxy.
+	// payload has the hostport
 	p := proxy.NewHTTPProxy(":8085", string(payload), proxy.Dialer(func(n string, addr string) (net.Conn, error) {
 		logger.Infow("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
@@ -156,7 +226,7 @@ func madTCPProxyThing() {
 }
 
 func main() {
-	lp, _ := zap.NewProduction()
+	lp, _ := zap.NewDevelopment()
 	logger := lp.Sugar()
 	defer logger.Sync()
 	sshclient(logger)
