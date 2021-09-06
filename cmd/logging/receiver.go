@@ -13,16 +13,16 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// the custom fields that are in every gatway log entry are in the form of a json object
 type fields map[string]interface{}
 
-//type caller struct {
-//	File string
-//	Line int
-//}
-
+// log entries from the gateway have a caller field that does not perfeclty
+// convert to the caller in a zapcore.Entry. It is composed of the line and file name.
+// This struct helps parse the caller
+// to aid in the conversion to a zapcore.Entry
 type caller string
 
-// Line -
+// Line parses the code line number
 func (c *caller) Line() int {
 
 	s := string(*c)
@@ -38,7 +38,7 @@ func (c *caller) Line() int {
 	return 0
 }
 
-// File -
+// File parses the file name from the caller string
 func (c *caller) File() string {
 
 	s := string(*c)
@@ -49,24 +49,8 @@ func (c *caller) File() string {
 	return ""
 }
 
-//func (c *caller) UnmarshalJSON(b []byte) error {
-//	var raw string
-//	if err := json.Unmarshal(b, &raw); err != nil {
-//		return err
-//	}
-//
-//	pieces := strings.Split(raw, ":")
-//	c.File = pieces[0]
-//	if len(pieces) > 1 {
-//		line, err := strconv.Atoi(pieces[1])
-//		if err != nil {
-//			return err
-//		}
-//		c.Line = line
-//	}
-//	return nil
-//}
-
+// entry is the struct used to describe the serialized log entry
+// coming from the gateway
 type entry struct {
 	fields
 	Level      string `json:"level"`
@@ -109,6 +93,7 @@ func (e *entry) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+// zapEntry converts to a zap entry
 func (e *entry) zapEntry() zapcore.Entry {
 	ti, err := time.Parse("2006-01-02T15:04:05.000Z0700", e.Ts)
 	if err != nil {
@@ -160,9 +145,12 @@ func NewLogReceiver(l *zap.Logger) *Receiver {
 	return r
 }
 
-// Decode -
+// Decode creates a json decoded the reads from the in reader.
+// It decodes an entry and logs it to the configured logger output
+// this needs to be run in a go routine, otherwise it blocks
 func (r *Receiver) Decode(in io.Reader) {
 
+	// TODO needs a channel to stop reading
 	rawEntry := json.NewDecoder(in)
 	for {
 		var e entry
