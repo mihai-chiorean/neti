@@ -5,5 +5,5 @@ import (
 )
 
 func getEncoderConfig() {
-	config := zap.NewProductionEncoderConfig()
+	_ = zap.NewProductionEncoderConfig()
 }
