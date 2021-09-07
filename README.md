@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/mihai-chiorean/neti/badge.svg?t=aPQhoi)](https://coveralls.io/github/mihai-chiorean/neti)
+
 # Name
 
 https://en.wikipedia.org/wiki/Neti_(deity)
