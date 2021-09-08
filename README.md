@@ -24,7 +24,7 @@ which will open an http server on port 8085
 
 # Structure
 
-## gateway
+## Gateway
 
 ### api/
 
@@ -40,3 +40,6 @@ Implemented so far:
 Currently it only opens a tcp port that it respons with. Once the client connects to it, the gateway is going to start sending logs to this port
 for the client to display.
 
+#### `NewHTTPProxy`
+
+Lazily initializes an http proxy on the gateway side.
