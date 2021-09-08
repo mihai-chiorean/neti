@@ -72,13 +72,11 @@ type Dialer func(n string, addr string) (net.Conn, error)
 // NewHTTPProxy starts a new proxy
 func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.SugaredLogger) *Proxy {
 	logger := log.Named("HTTPProxy")
-	// downstream connection
-	t := &http.Transport{
-		Dial: func(n string, addr string) (net.Conn, error) {
-			logger.Debugw("Dialing..", "hostport", hostport, "remote", remote, "addr", addr)
-			return net.Dial("tcp", remote)
-		},
+	if dialer == nil {
+		logger.Fatal("Dialer  not passed")
 	}
+	// downstream connection
+	t := &http.Transport{}
 	if dialer != nil {
 		t.Dial = dialer
 	}

@@ -147,9 +147,13 @@ func (s *Server) newHTTPProxy(req *ssh.Request, target string) {
 
 	// TODO Replace with new http proxy; the request should have some
 	//		the request should have some destination service name or port
+	dialer := func(n string, addr string) (net.Conn, error) {
+		log.Debugw("Dialing..", "remote", target, "addr", addr)
+		return net.Dial("tcp", target)
+	}
 
 	// Start new http listener on an ephemeral port
-	p := proxy.NewHTTPProxy(":0", target, nil, s.log)
+	p := proxy.NewHTTPProxy(":0", target, dialer, s.log)
 	go func() {
 		p.Start()
 	}()
