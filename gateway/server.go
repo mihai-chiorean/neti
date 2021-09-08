@@ -82,6 +82,7 @@ func (s *Server) routeRequests(in <-chan *ssh.Request) {
 		case "Handshake":
 			s.handshake(req)
 		case "NewHTTPProxy":
+			// TODO change this to an ctual service, not a hardcoded one
 			s.newHTTPProxy(req, "dummy:80")
 		default:
 			{
@@ -140,33 +141,26 @@ func (s *Server) handshake(req *ssh.Request) {
 }
 
 func (s *Server) newHTTPProxy(req *ssh.Request, target string) {
-	s.log.Infow("Opening new HTTP handler")
+	log := s.log.Named("gateway_proxy").With("target", target)
+	log.Infow("Opening new HTTP handler")
 	// TODO make a struct for the payload that includes some service name/port
 
 	// TODO Replace with new http proxy; the request should have some
 	//		the request should have some destination service name or port
+	dialer := func(n string, addr string) (net.Conn, error) {
+		log.Debugw("Dialing..", "remote", target, "addr", addr)
+		return net.Dial("tcp", target)
+	}
 
 	// Start new http listener on an ephemeral port
-	p := proxy.NewHTTPProxy(":0", target, nil, s.log)
+	p := proxy.NewHTTPProxy(":0", target, dialer, s.log)
 	go func() {
 		p.Start()
 	}()
 
-	s.log.Infow("HTTP Proxy started", "hostport", p.ListenerHost())
-	t, err := net.Listen("tcp", ":0")
-	if err != nil {
-		s.log.Error("Failed to open tcp listener", "error", err)
-		return
-	}
-	s.log.Infow("Starting http listener")
-	go func(t net.Listener) {
-		http.Serve(t, http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			fmt.Fprintf(resp, "Hello proxy!")
-		}))
-	}(t)
-	s.log.Infow("Http proxy listening", "addr", t.Addr().String())
-	s.proxies[t.Addr().String()] = t
-	req.Reply(true, []byte(t.Addr().String()))
+	log.Infow("HTTP Proxy started", "hostport", p.ListenerHost())
+	s.proxies[p.ListenerHost()] = p
+	req.Reply(true, []byte(p.ListenerHost()))
 }
 
 func (s *Server) proxyTCP(dest string, ch io.ReadWriteCloser) error {

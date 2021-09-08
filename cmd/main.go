@@ -84,7 +84,7 @@ func sshclient(logger *zap.SugaredLogger) {
 	}
 	logger.Info("Handshake received", "payload", handshakeRes)
 
-	gwLogger := logging.NewGatewayLogger(zapcore.DebugLevel, handshakeRes.LoggerListener, logger.Desugar())
+	gwLogger := logging.NewGatewayLogger(zapcore.DebugLevel, handshakeRes.LoggerListener, logger.Named("GATEWAY").Desugar())
 	gwLogger.Start(conn)
 
 	// this is another api that the gateway provides. At the moment there is no payload schema for it
