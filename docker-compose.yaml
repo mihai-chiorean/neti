@@ -6,14 +6,11 @@ services:
       context: .
       target: gateway
     ports:
-      - 22:22
       - 8022:8022
     secrets:
       - id_rsa
   dummy:
     image: eexit/mirror-http-server
-    ports:
-      - 80:80
 
 secrets:
   id_rsa:
