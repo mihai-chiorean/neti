@@ -77,10 +77,9 @@ func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.Sugare
 	}
 	// downstream connection
 	t := &http.Transport{}
-	if dialer != nil {
-		t.Dial = dialer
-	}
+	t.Dial = dialer
 
+	// TODO probably move this listener in the Start() or merge Start() with this.
 	l, err := net.Listen("tcp", hostport)
 	if err != nil {
 		log.Error("Failed to open tcp listener", "error", err)
