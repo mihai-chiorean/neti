@@ -26,6 +26,7 @@ type Proxy struct {
 	downstreamHost string
 }
 
+// ServeHTTP is the handler that proxies the request through
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.log.Debugw("Received request", "method", req.Method, "host", req.Host, "remote", req.RemoteAddr, "url", req.RequestURI, "requrl", req.URL)
 	// step 1
@@ -65,8 +66,8 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	res.Body.Close()
 }
 
-// TODO this kind of interface is used in the cli too. move this to some common package
 // Dialer is the downstream dialer function
+// TODO this kind of interface is used in the cli too. move this to some common package
 type Dialer func(n string, addr string) (net.Conn, error)
 
 // NewHTTPProxy starts a new proxy
