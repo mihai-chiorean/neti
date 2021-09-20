@@ -194,14 +194,14 @@ func (s *Server) proxyTCP(dest string, ch io.ReadWriteCloser) error {
 
 func (s *Server) handleDirectTCP(newChannel ssh.NewChannel) {
 	logger := s.log
-	logger.Info("Direct channel")
+	logger.Debug("Direct channel")
 	var fwdData localForwardChannelData
 	if err := ssh.Unmarshal(newChannel.ExtraData(), &fwdData); err != nil {
 		logger.Error(err)
 		return
 	}
 
-	logger.Infow("Got forwarding data",
+	logger.Debugw("Got forwarding data",
 		"dest", fwdData.DestAddr,
 		"destPort", fwdData.DestPort,
 	)
@@ -320,8 +320,8 @@ func (s *Server) Listen(hostport string) (func(), error) {
 
 				go func(l net.Listener) {
 					http.Serve(l, http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-						resp.WriteHeader(500).Write("Not the plmbing  you are looking for")
-
+						resp.WriteHeader(500)
+						resp.Write([]byte(`Not the plmbing  you are looking for`))
 					}))
 				}(listener)
 			}
