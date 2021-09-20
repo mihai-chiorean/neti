@@ -87,8 +87,15 @@ func sshclient(logger *zap.SugaredLogger) {
 	gwLogger := logging.NewGatewayLogger(zapcore.DebugLevel, handshakeRes.LoggerListener, logger.Named("GATEWAY").Desugar())
 	gwLogger.Start(conn)
 
+	httpProxyReq := api.HTTPProxyRequest{
+		ServiceHostPort: "dummy:80",
+	}
+
+	// TODO handle error
+	body, _ = json.Marshal(&httpProxyReq)
+
 	// this is another api that the gateway provides. At the moment there is no payload schema for it
-	_, payload, err = conn.SendRequest("NewHTTPProxy", true, []byte(`duude!`))
+	_, payload, err = conn.SendRequest("NewHTTPProxy", true, body)
 	if err != nil {
 		logger.Fatal(err)
 	}
