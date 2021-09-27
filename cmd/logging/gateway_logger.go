@@ -40,7 +40,7 @@ func (l *gwLogger) Start(conn dialer) error {
 	return nil
 }
 
-// GatewatLogger is the interface used to control a gateway logger
+// GatewayLogger is the interface used to control a gateway logger
 type GatewayLogger interface {
 	Start(dialer) error
 }

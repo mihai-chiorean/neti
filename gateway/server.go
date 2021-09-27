@@ -178,16 +178,16 @@ func (s *Server) proxyTCP(dest string, ch io.ReadWriteCloser) error {
 
 	// to
 	go func() {
-		s.log.Info("Streaming data TO")
+		s.log.Debug("Streaming data TO")
 		defer ch.Close()
 		defer dconn.Close()
 		io.Copy(ch, dconn)
-		s.log.Info("Closing tcp proxy ->")
+		s.log.Debug("Closing tcp proxy ->")
 	}()
 
 	// from
 	go func() {
-		s.log.Infow("Streaming data FROM", "field", "value")
+		s.log.Debug("Streaming data FROM")
 		defer ch.Close()
 		defer dconn.Close()
 		io.Copy(dconn, ch)
@@ -199,14 +199,14 @@ func (s *Server) proxyTCP(dest string, ch io.ReadWriteCloser) error {
 
 func (s *Server) handleDirectTCP(newChannel ssh.NewChannel) {
 	logger := s.log
-	logger.Info("Direct channel")
+	logger.Debug("Direct channel")
 	var fwdData localForwardChannelData
 	if err := ssh.Unmarshal(newChannel.ExtraData(), &fwdData); err != nil {
 		logger.Error(err)
 		return
 	}
 
-	logger.Infow("Got forwarding data",
+	logger.Debugw("Got forwarding data",
 		"dest", fwdData.DestAddr,
 		"destPort", fwdData.DestPort,
 	)
@@ -252,6 +252,8 @@ func (s *Server) Listen(hostport string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// basically expecting 1 connection, given the 1cli-1gw process pairing
 	s.log.Infow("Accepting connections", "where", hostport)
 	nConn, err := listener.Accept()
 	if err != nil {
@@ -276,6 +278,11 @@ func (s *Server) Listen(hostport string) (func(), error) {
 			"type", newChannel.ChannelType(),
 			"data", string(newChannel.ExtraData()),
 		)
+
+		// Channels have a type, depending on the application level
+		// protocol intended. In the case of a shell, the type is
+		// "session" and ServerShell may be used to present a simple
+		// terminal interface.
 		switch newChannel.ChannelType() {
 		case "session":
 			{
@@ -298,37 +305,30 @@ func (s *Server) Listen(hostport string) (func(), error) {
 		case "direct-tcpip":
 			{
 				s.handleDirectTCP(newChannel)
-				// TODO start tcp listener on random port
-				//ch, directReq, err := newChannel.Accept()
-				//if err != nil {
-				//	logger.Error("Could not accept channel", err)
-				//	continue
-				//}
-				//go func(in <-chan *ssh.Request) {
-				//	for req := range in {
-				//		logger.Infow("Request on direct ip channel",
-				//			"type", req.Type,
-				//			"payload", string(req.Payload),
-				//		)
-				//		req.Reply(true, nil)
-				//	}
-				//}(directReq)
-				//go func() {
-				//	defer ch.Close()
-				//	scanner := bufio.NewScanner(ch)
-				//	scanner.Split(bufio.ScanLines)
-				//	count := 0
-				//	for scanner.Scan() {
-				//		count++
-				//		logger.Info(scanner.Text())
-				//	}
-				//	if err := scanner.Err(); err != nil {
-				//		fmt.Println(err)
-				//	}
-				//	logger.Info(count)
-				//	ch.Write([]byte(`done`))
-				//}()
 				continue
+			}
+		// (mihai) NOT USED AS OF 9/16
+		case "tcpip-forward":
+			{
+				// TODO start tcp listener on random port
+				_, _, err := newChannel.Accept()
+				if err != nil {
+					logger.Error("Could not accept channel", err)
+					continue
+				}
+
+				listener, err := net.Listen("tcp", "0.0.0.0:0")
+				if err != nil {
+					logger.Error(err, "Failed to open tcp listener for proxy")
+					continue
+				}
+
+				go func(l net.Listener) {
+					http.Serve(l, http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+						resp.WriteHeader(500)
+						resp.Write([]byte(`Not the plmbing  you are looking for`))
+					}))
+				}(listener)
 			}
 		default:
 			{
@@ -337,31 +337,6 @@ func (s *Server) Listen(hostport string) (func(), error) {
 			}
 		}
 
-		// Channels have a type, depending on the application level
-		// protocol intended. In the case of a shell, the type is
-		// "session" and ServerShell may be used to present a simple
-		// terminal interface.
-		if newChannel.ChannelType() == "tcpip-forward" {
-			// TODO start tcp listener on random port
-			_, _, err := newChannel.Accept()
-			if err != nil {
-				logger.Error("Could not accept channel", err)
-				continue
-			}
-
-			listener, err := net.Listen("tcp", "0.0.0.0:0")
-			if err != nil {
-				logger.Error(err, "Failed to open tcp listener for proxy")
-				continue
-			}
-
-			go func(l net.Listener) {
-				http.Serve(l, http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-					fmt.Fprintf(resp, "Hello world!\n")
-
-				}))
-			}(listener)
-		}
 	}
 	return nil, nil
 }

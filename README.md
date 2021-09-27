@@ -22,6 +22,13 @@ which will open an http server on port 8085
 
 4. In another terminal `curl localhost:8085` will respond with "hello world"
 
+# Overall architecture
+
+https://whimsical.com/overall-arch-4Kke4cpqMq4zTubQdR82w4
+
+![overall arch@2x](https://user-images.githubusercontent.com/2073397/133947793-b12799c6-a489-4a33-89ae-bd39b4740054.png)
+
+
 # Structure
 
 ## Gateway

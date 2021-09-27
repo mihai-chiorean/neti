@@ -24,14 +24,6 @@ import (
 // Config -
 type Config struct{}
 
-// Proxy -
-type Proxy struct{}
-
-// NewProxy -
-func NewProxy() *Proxy {
-	return nil
-}
-
 type logDecoder interface {
 	Decode(in io.Reader)
 	Log([]byte)
@@ -101,25 +93,6 @@ func sshclient(logger *zap.SugaredLogger) {
 	}
 
 	logger.Info("addr", payload, "Received http proxy payload")
-
-	//httpconn, err := conn.Dial("tcp", string(payload))
-	//if err != nil {
-	//	logger.Fatal(err)
-	//}
-	//var hs map[string]interface{}
-	//if err := json.Unmarshal(payload, &hs); err != nil {
-	//	logger.Fatal(err)
-	//}
-
-	logger.Info(string(payload))
-
-	// Request the remote side to open port 8080 on all interfaces.
-	//l, err := conn.Listen("tcp", ":8085")
-	//if err != nil {
-	//	logger.Fatal(err, "unable to register tcp forward: ")
-	//}
-	//defer l.Close()
-	//logger.Info("Listening tcp on ", l.Addr().String())
 
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
