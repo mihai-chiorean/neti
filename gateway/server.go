@@ -83,7 +83,7 @@ func (s *Server) routeRequests(in <-chan *ssh.Request) {
 			s.handshake(req)
 		case "NewHTTPProxy":
 			// TODO change this to an ctual service, not a hardcoded one
-			s.newHTTPProxy(req, "dummy:80")
+			s.newHTTPProxy(req)
 		default:
 			{
 				if req.WantReply {
@@ -140,10 +140,15 @@ func (s *Server) handshake(req *ssh.Request) {
 	req.Reply(true, payload)
 }
 
-func (s *Server) newHTTPProxy(req *ssh.Request, target string) {
+func (s *Server) newHTTPProxy(req *ssh.Request) {
 	log := s.log.Named("gateway_proxy").With("target", target)
 	log.Infow("Opening new HTTP handler")
-	// TODO make a struct for the payload that includes some service name/port
+
+	var httpProxyReq api.HTTPProxyRequest
+	if err := json.Unmarshal(req.Payload, &httpProxyReq); err != nil {
+		log.Error(err)
+		return
+	}
 
 	// TODO Replace with new http proxy; the request should have some
 	//		the request should have some destination service name or port
