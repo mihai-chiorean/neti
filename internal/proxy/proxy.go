@@ -8,16 +8,18 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"syscall"
 
 	"go.uber.org/zap"
 )
 
 // Config -
-type Config struct{}
+type Config struct {
+	//Heartbeat
+	// Timeout
+}
 
-// Proxy -
-type Proxy struct {
+// HTTPProxy -
+type HTTPProxy struct {
 	srv            *http.Server
 	done           chan os.Signal
 	log            *zap.SugaredLogger
@@ -27,7 +29,7 @@ type Proxy struct {
 }
 
 // ServeHTTP is the handler that proxies the request through
-func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (p *HTTPProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.log.Debugw("Received request", "method", req.Method, "host", req.Host, "remote", req.RemoteAddr, "url", req.RequestURI, "requrl", req.URL)
 	// step 1
 	outReq := new(http.Request)
@@ -60,73 +62,76 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			rw.Header().Add(key, v)
 		}
 	}
-	p.log.Debug("Proxy streams")
+	p.log.Debug("HTTPProxy streams")
 	rw.WriteHeader(res.StatusCode)
 	io.Copy(rw, res.Body)
 	res.Body.Close()
 }
 
 // Dialer is the downstream dialer function
-// TODO this kind of interface is used in the cli too. move this to some common package
 type Dialer func(n string, addr string) (net.Conn, error)
 
 // NewHTTPProxy starts a new proxy
-func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.SugaredLogger) *Proxy {
+func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.SugaredLogger) *HTTPProxy {
 	logger := log.Named("HTTPProxy")
 	if dialer == nil {
 		logger.Fatal("Dialer  not passed")
 	}
+
+	// TODO use context dialer
 	// downstream connection
 	t := &http.Transport{}
 	t.Dial = dialer
 
-	// TODO probably move this listener in the Start() or merge Start() with this.
-	l, err := net.Listen("tcp", hostport)
-	if err != nil {
-		log.Error("Failed to open tcp listener", "error", err)
-		return nil
-	}
-	p := Proxy{
+	p := HTTPProxy{
 		done:           make(chan os.Signal, 1),
 		log:            logger,
 		transport:      t,
-		listener:       l,
 		downstreamHost: remote,
 	}
+	srv := &http.Server{}
+	mux := http.NewServeMux()
+	mux.Handle("/", &p)
+	srv.Handler = mux
+	p.srv = srv
 
 	return &p
 }
 
 // Start starts the http listener. This is blocking
-func (p *Proxy) Start() {
-	srv := &http.Server{}
-	mux := http.NewServeMux()
-	mux.Handle("/", p)
-	srv.Handler = mux
-	go func() {
-		// listener
-		if err := srv.Serve(p.listener); err != nil {
-			p.log.Fatal(err)
-		}
-		//if err := srv.ListenAndServe(); err != nil {
-		//	p.log.Fatal(err)
-		//}
-	}()
-	p.srv = srv
-	<-p.done
-
-	p.log.Info("Shutting down proxy")
-	if err := srv.Shutdown(context.Background()); err != nil {
-		p.log.Error(err)
+func (p *HTTPProxy) ListenAndServe() (net.Listener, error) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		p.log.With("error", err).Error("Failed to open tcp listener")
+		return nil, err
 	}
+	p.listener = l
+	p.log.Debug("Starting listener")
+	go func(l net.Listener) {
+		p.log.Debug("Starting http proxy")
+		// listener
+		if err := p.srv.Serve(l); err != nil {
+			p.log.With("error", err).Error("Unable to serve proxy")
+		}
+	}(l)
+
+	return l, nil
 }
 
 // Stop stops the http proxy
-func (p *Proxy) Stop() {
-	p.done <- syscall.SIGSTOP
+func (p *HTTPProxy) Stop() {
+	p.log.Info("Shutting down proxy")
+	if err := p.srv.Shutdown(context.Background()); err != nil {
+		p.log.Error(err)
+	}
+
 }
 
 // ListenerHost gets the server addr
-func (p *Proxy) ListenerHost() string {
+func (p *HTTPProxy) ListenerHost() string {
+	// TODO make this error
+	if p.listener == nil {
+		return ""
+	}
 	return p.listener.Addr().String()
 }

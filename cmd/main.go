@@ -106,7 +106,7 @@ func sshclient(logger *zap.SugaredLogger) {
 
 		return newChannel, nil
 	}), logger)
-	p.Start()
+	p.ListenAndServe()
 }
 
 func madTCPProxyThing() {
