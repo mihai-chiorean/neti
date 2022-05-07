@@ -50,3 +50,8 @@ for the client to display.
 #### `NewHTTPProxy`
 
 Lazily initializes an http proxy on the gateway side.
+
+
+# Useful links
+
+- https://istio.io/latest/docs/tasks/traffic-management/request-routing/
