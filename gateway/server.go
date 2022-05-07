@@ -141,6 +141,8 @@ func (s *Server) handshake(req *ssh.Request) {
 }
 
 func (s *Server) newHTTPProxy(req *ssh.Request) {
+	// hack to pass go-vet. will be fixed in next PRs
+	target := ""
 	log := s.log.Named("gateway_proxy").With("target", target)
 	log.Infow("Opening new HTTP handler")
 
