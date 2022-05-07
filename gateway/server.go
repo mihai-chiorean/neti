@@ -141,16 +141,16 @@ func (s *Server) handshake(req *ssh.Request) {
 }
 
 func (s *Server) newHTTPProxy(req *ssh.Request) {
-	// hack to pass go-vet. will be fixed in next PRs
-	target := ""
-	log := s.log.Named("gateway_proxy").With("target", target)
-	log.Infow("Opening new HTTP handler")
 
 	var httpProxyReq api.HTTPProxyRequest
 	if err := json.Unmarshal(req.Payload, &httpProxyReq); err != nil {
-		log.Error(err)
+		s.log.Error(err)
 		return
 	}
+
+	target := httpProxyReq.ServiceHostPort
+	log := s.log.Named("gateway_proxy").With("target", target)
+	log.Infow("Opening new HTTP handler")
 
 	// TODO Replace with new http proxy; the request should have some
 	//		the request should have some destination service name or port
@@ -162,7 +162,7 @@ func (s *Server) newHTTPProxy(req *ssh.Request) {
 	// Start new http listener on an ephemeral port
 	p := proxy.NewHTTPProxy(":0", target, dialer, s.log)
 	go func() {
-		p.Start()
+		p.ListenAndServe()
 	}()
 
 	log.Infow("HTTP Proxy started", "hostport", p.ListenerHost())
