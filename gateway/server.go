@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/mihai-chiorean/cerberus/gateway/api"
-	"github.com/mihai-chiorean/cerberus/internal/proxy"
+	"github.com/mihai-chiorean/neti/gateway/api"
+	"github.com/mihai-chiorean/neti/internal/proxy"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/ssh"

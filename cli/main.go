@@ -1,5 +1,5 @@
 /*
-   Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+   Copyright © 2021 NAME HERE mihai.v.chiorean@gmail.com
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/mihai-chiorean/cerberus/cmd/cmd"
-	"github.com/mihai-chiorean/cerberus/cmd/logging"
-	"github.com/mihai-chiorean/cerberus/gateway/api"
-	"github.com/mihai-chiorean/cerberus/internal/proxy"
+	"github.com/mihai-chiorean/neti/cli/cmd"
+	"github.com/mihai-chiorean/neti/cli/logging"
+	"github.com/mihai-chiorean/neti/gateway/api"
+	"github.com/mihai-chiorean/neti/internal/proxy"
 	"github.com/rs/zerolog"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
