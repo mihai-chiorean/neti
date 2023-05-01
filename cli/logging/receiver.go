@@ -120,10 +120,9 @@ func (e *entry) zapEntry() zapcore.Entry {
 		Message:    e.Msg,
 		Stack:      e.Stack,
 		Caller: zapcore.EntryCaller{
-			File:     e.Caller.File(),
-			Function: e.Function,
-			Defined:  true,
-			Line:     e.Caller.Line(),
+			File:    e.Caller.File(),
+			Defined: true,
+			Line:    e.Caller.Line(),
 		},
 	}
 	return ze

@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-//package proxy
+// package proxy
 package main
 
 import (
@@ -25,6 +25,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/mihai-chiorean/neti/cli/cmd"
@@ -123,7 +124,15 @@ func sshclient(logger *zap.SugaredLogger) {
 
 		return newChannel, nil
 	}), logger)
-	p.ListenAndServe()
+	l, err := p.ListenAndServe()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	logger.Debug(l.Addr().String())
+	defer l.Close()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
 }
 
 func madTCPProxyThing() {
@@ -181,9 +190,18 @@ func madTCPProxyThing() {
 }
 
 func main() {
+
 	lp, _ := zap.NewDevelopment()
 	logger := lp.Sugar()
 	defer logger.Sync()
+
+	// logger.Info("Starting DNS server on port 8889")
+	// dns := dns.NewDNSServer(53)
+	// TODO dns.AddZoneData(zone string, records map[string]string, lookupFunc func(string) (string, error), lookupZone dns.ZoneType)
+	// if err := dns.StartAndServe(); err != nil {
+	// logger.Fatal(err)
+	// }
+
 	sshclient(logger)
 
 	cmd.Execute()

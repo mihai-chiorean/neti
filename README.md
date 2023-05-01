@@ -6,21 +6,25 @@ https://en.wikipedia.org/wiki/Neti_(deity)
 
 # How to run
 
-1. You'll need to create an unencripted RSA private key `private-unencrypted.pem` that will be used by the ssh tunnel to the docker container to create `known_hosts` 
+1. You'll need to create an unencripted RSA private key `private-unencrypted.pem` that will be used by the ssh tunnel to the docker container to create `known_hosts`
 
-2. 
+2.
+
 ```
 docker-compose up --build
 ```
+
 will build and start the gateway in a docker container
 
 3. In a separate terminal
+
 ```
-go run internal/proxy/proxy.go
+go run cli/main.go
 ```
+
 which will open an http server on port 8085
 
-4. In another terminal `curl localhost:8085` will respond with "hello world"
+Note: next step is broken, need to fix it 4. In another terminal `curl localhost:8085` will respond with "hello world"
 
 # Overall architecture
 
@@ -28,6 +32,9 @@ https://whimsical.com/overall-arch-4Kke4cpqMq4zTubQdR82w4
 
 ![overall arch@2x](https://user-images.githubusercontent.com/2073397/133947793-b12799c6-a489-4a33-89ae-bd39b4740054.png)
 
+# DNS Server
+
+To reduce configuration friction, we want services to not have to have separate local configuraitons in their own repo for routing. To use the same configuraiton as prod, we need to understand the DNSs mapped inside the k8s cluster. One of the main challenges here is doing this mapping on local `/etc/hosts` is too much friction. However, if we can edit `/etc/hosts` one time and add an entry that points to a fake DNS server that we run, then we have control over this routing and can map the service DNSs on the fly.
 
 # Structure
 
@@ -39,6 +46,7 @@ This package holds the "communication protocol" between the client and the gatew
 some operations (like opening a proxy).
 
 Implemented so far:
+
 1. Handshake
 2. NewHTTPProxy
 
@@ -51,7 +59,12 @@ for the client to display.
 
 Lazily initializes an http proxy on the gateway side.
 
-
 # Useful links
 
 - https://istio.io/latest/docs/tasks/traffic-management/request-routing/
+
+# TODO:
+
+## 1. Setup a DNS server
+
+## 2. Docs on how to run and test

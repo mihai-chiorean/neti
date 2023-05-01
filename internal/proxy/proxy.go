@@ -89,6 +89,7 @@ func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.Sugare
 		transport:      t,
 		downstreamHost: remote,
 	}
+	logger.Debug("setting downstream host", "host", remote)
 	srv := &http.Server{}
 	mux := http.NewServeMux()
 	mux.Handle("/", &p)
