@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -19,11 +20,14 @@ func TestNewHTTPProxy(t *testing.T) {
 	}))
 	defer vr.Close()
 
-	dialer := func(n string, addr string) (net.Conn, error) {
-		return net.Dial("tcp", vr.Listener.Addr().String())
+	dialer := func(ctx context.Context, n, addr string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(context.Background(), "tcp", vr.Listener.Addr().String())
 	}
-	log := zap.NewNop()
-	p := NewHTTPProxy(":0", vr.Listener.Addr().String(), dialer, log.Sugar())
+
+	log, _ := zap.NewDevelopment()
+
+	p, _ := NewHTTPProxy(":8085", vr.Listener.Addr().String(), dialer, log.Sugar())
 
 	_, err := p.ListenAndServe()
 	assert.NoError(t, err)

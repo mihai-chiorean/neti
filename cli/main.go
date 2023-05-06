@@ -114,7 +114,7 @@ func sshclient(logger *zap.SugaredLogger) {
 
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
-	p := proxy.NewHTTPProxy(":8085", string(payload), proxy.Dialer(func(n string, addr string) (net.Conn, error) {
+	p, _ := proxy.NewHTTPProxy(":8085", string(payload), proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
 		logger.Infow("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
 		if err != nil {
