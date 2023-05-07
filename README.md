@@ -38,6 +38,16 @@ https://whimsical.com/overall-arch-4Kke4cpqMq4zTubQdR82w4
 
 ![overall arch@2x](https://user-images.githubusercontent.com/2073397/133947793-b12799c6-a489-4a33-89ae-bd39b4740054.png)
 
+## What is a "bastion" server?
+
+https://en.wikipedia.org/wiki/Bastion_host
+
+### tl;dr
+
+> a server that is exposed to the internet and is used to access other servers in the private network.
+
+In our case, the bastian is `sshd` listening on a known port.
+
 # DNS Server
 
 To reduce configuration friction, we want services to not have to have separate local configuraitons in their own repo for routing. To use the same configuraiton as prod, we need to understand the DNSs mapped inside the k8s cluster. One of the main challenges here is doing this mapping on local `/etc/hosts` is too much friction. However, if we can edit `/etc/hosts` one time and add an entry that points to a fake DNS server that we run, then we have control over this routing and can map the service DNSs on the fly.
@@ -45,6 +55,19 @@ To reduce configuration friction, we want services to not have to have separate 
 # Structure
 
 ## Gateway
+
+The bastion is `sshd`, which is exposed to the internet and is used to access the gateway server. We open an SSH connection - including the relevant auth - to the ssh server on 8023.
+Once we have the handshake completed, we run a command that starts a gateway process. Once the gateway process is started, we can start sending commands to it via the ssh connection - basically we have a subchannel that connects to it.
+Then we use the API to open HTTP proxies.
+
+The benefits of this architecture:
+
+- separate gateway process for each user connecting.
+- while working on the cli, every time the cli is started, it's paired with a new gateway process, in stead of the gw "dying" when the cli is closed.
+
+### Open question:
+
+- do we need a subchannel for each http proxy though both the bastion and the gateway to properly multiplex? Or is this happening already?
 
 ### api/
 

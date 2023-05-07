@@ -163,8 +163,12 @@ func (s *Server) newHTTPProxy(req *ssh.Request) {
 	// Start new http listener on an ephemeral port
 	p, _ := proxy.NewHTTPProxy(":0", target, dialer, s.log)
 
-	// non blocking. starts a goroutine and initializes the listener
-	p.ListenAndServe()
+	_, err := p.ListenAndServe()
+	if err != nil {
+		log.Error(err)
+		req.Reply(false, nil)
+		return
+	}
 
 	log.Infow("HTTP Proxy started", "hostport", p.ListenerHost())
 	s.proxies[p.ListenerHost()] = p

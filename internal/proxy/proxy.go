@@ -97,7 +97,7 @@ type Dialer func(ctx context.Context, n string, addr string) (net.Conn, error)
 
 // NewHTTPProxy starts a new proxy
 func NewHTTPProxy(hostport string, remote string, dialer Dialer, log *zap.SugaredLogger) (*HTTPProxy, error) {
-	logger := log.Named("HTTPProxy")
+	logger := log.With("hostport", hostport, "remote", remote)
 	if dialer == nil {
 		ErrNilDialer := fmt.Errorf("must pass a dialer")
 		return nil, ErrNilDialer
