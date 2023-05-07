@@ -24,7 +24,13 @@ go run cli/main.go
 
 which will open an http server on port 8085
 
-Note: next step is broken, need to fix it 4. In another terminal `curl localhost:8085` will respond with "hello world"
+4. In a separate terminal
+
+```
+curl -X POST localhost:8085 -H "Content-Type: application/json" -H "X-Mirror-Body: true" -d '{"productId": 123456, "quantity": 100}'
+```
+
+`X-Mirror-Body: true` makes the dummy server return the body of the request as the response.
 
 # Overall architecture
 

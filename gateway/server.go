@@ -163,7 +163,6 @@ func (s *Server) newHTTPProxy(req *ssh.Request) {
 	// Start new http listener on an ephemeral port
 	p, _ := proxy.NewHTTPProxy(":0", target, dialer, s.log)
 	go func() {
-		p.ListenAndServe()
 	}()
 
 	log.Infow("HTTP Proxy started", "hostport", p.ListenerHost())
