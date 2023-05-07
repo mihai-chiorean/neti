@@ -162,9 +162,12 @@ func (s *Server) newHTTPProxy(req *ssh.Request) {
 
 	// Start new http listener on an ephemeral port
 	p, _ := proxy.NewHTTPProxy(":0", target, dialer, s.log)
-	go func() {
-	}()
-
+	_, err := p.ListenAndServe()
+	if err != nil {
+		log.Error(err)
+		req.Reply(false, nil)
+		return
+	}
 	log.Infow("HTTP Proxy started", "hostport", p.ListenerHost())
 	s.proxies[p.ListenerHost()] = p
 	req.Reply(true, []byte(p.ListenerHost()))

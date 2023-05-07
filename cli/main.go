@@ -36,7 +36,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/ssh"
-	knownhosts "golang.org/x/crypto/ssh/knownhosts"
 )
 
 // Config -
@@ -48,33 +47,78 @@ type logDecoder interface {
 }
 
 func sshclient(logger *zap.SugaredLogger) {
-	homedir, err := os.UserHomeDir()
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	hostKeyCallback, err := knownhosts.New(fmt.Sprintf("%s/.ssh/known_hosts", homedir))
-	if err != nil {
-		logger.Fatal(err)
-	}
 
 	// TODO we need to make this work with a public key, not a password
-	//var hostKey ssh.PublicKey
+	logger.Info("Dialing 8023...")
 	config := &ssh.ClientConfig{
 		User: "testuser",
 		Auth: []ssh.AuthMethod{
 			ssh.Password("tiger"),
 		},
-		HostKeyCallback: hostKeyCallback, //ssh.FixedHostKey(hostKey),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //hostKeyCallback, //ssh.FixedHostKey(hostKey),
 	}
 
 	// Dial your ssh server.
-	conn, err := ssh.Dial("tcp", "localhost:8022", config)
+	connAuth, err := ssh.Dial("tcp", "127.0.0.1:8023", config)
 	if err != nil {
 		logger.Fatal(err, "unable to connect: ")
 	}
+	defer connAuth.Close()
+
+	logger.Info("Starting SSH session")
+	// Perform the SSH handshake
+	sshSession, err := connAuth.NewSession()
+	if err != nil {
+		log.Fatalf("Failed to create SSH session: %s", err)
+	}
+	defer sshSession.Close()
+
+	// Redirect the session's output to the local stdout
+	sshSession.Stdout = os.Stdout
+	sshSession.Stderr = os.Stderr
+
+	logger.Info("Echo to session")
+
+	// Start the session and wait for the force command to be executed
+	// Need this to be in a goroutine because it will block until the command is done
+	go func() {
+		if err = sshSession.Run("/bin/gateway "); err != nil {
+			log.Fatalf("Failed to execute command: %s", err)
+		}
+	}()
+
+	logger.Info("Waiting for the gw to start listening... (2 sec timer)")
+
+	time.Sleep(2 * time.Second)
+	// Create a connection from server A to server B
+	connAB, err := connAuth.Dial("tcp", "127.0.0.1:8022")
+	if err != nil {
+		log.Fatalf("Failed to connect to server B through server A: %s", err)
+	}
+
+	// Establish an SSH connection with server B using the connection from server A
+	connB, chans, reqs, err := ssh.NewClientConn(connAB, "127.0.0.1:8022", config)
+	if err != nil {
+		log.Fatalf("Failed to establish SSH connection with server B: %s", err)
+	}
+	defer connB.Close()
+
+	// Create an SSH client from the connection with server B
+	clientB := ssh.NewClient(connB, chans, reqs)
+	defer clientB.Close()
+
+	// TODO this is a hack to wait for the command to be executed
+	// TODO if each user is connected to a different gw process, we need to figure out the listener port for each client to connect to
+	logger.Info("Dialing 8022")
+
+	// Dial your ssh server.
+	conn := ssh.NewClient(connB, chans, reqs)
+	// if err != nil {
+	// 	logger.Fatal(err, "unable to connect: ")
+	// }
 	defer conn.Close()
 
+	logger.Info("Sending handshake to gateway")
 	handshake := api.HandshakeRequest{
 		LoggerAddr: ":0",
 	}
@@ -87,6 +131,8 @@ func sshclient(logger *zap.SugaredLogger) {
 	if err != nil {
 		logger.Fatal(err)
 	}
+	logger.Info("Handshake?")
+
 	// this is the handshake response; it will expose the port logs come on
 	var handshakeRes api.Handshake
 	if err := json.Unmarshal(payload, &handshakeRes); err != nil {
