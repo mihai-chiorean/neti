@@ -71,6 +71,7 @@ func (p *HTTPProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusBadGateway)
 		return
 	}
+	defer res.Body.Close() // close the body
 	log.Debug("Copying headers")
 
 	// step 3
@@ -83,8 +84,12 @@ func (p *HTTPProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(res.StatusCode)
 
 	// step 4 copy the response body
-	io.Copy(rw, res.Body)
-	res.Body.Close() // close the body
+	size, err := io.Copy(rw, res.Body)
+	if err != nil {
+		p.log.Error(err.Error())
+	}
+	log.Debug("Response body copied", "size", size)
+
 }
 
 // Dialer is the downstream dialer function
@@ -129,13 +134,13 @@ func (p *HTTPProxy) ListenAndServe() (net.Listener, error) {
 	}
 	p.listener = l
 	p.log.With("hostport", p.hostport).Debug("Starting listener")
-	// go func(l net.Listener) {
-	p.log.Debug("Starting http proxy")
-	// listener
-	if err := p.srv.Serve(l); err != nil {
-		p.log.With("error", err).Error("Unable to serve proxy")
-	}
-	// }(l)
+	go func(l net.Listener) {
+		p.log.Debug("Starting http proxy")
+		// listener
+		if err := p.srv.Serve(l); err != nil {
+			p.log.With("error", err).Error("Unable to serve proxy")
+		}
+	}(l)
 
 	return l, nil
 }
