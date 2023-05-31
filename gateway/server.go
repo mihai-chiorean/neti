@@ -259,6 +259,10 @@ func (s *Server) Listen(hostport string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
+	s.log.Infow("gateway listening", "hostport", listener.Addr())
+
+	// prints hostport to STDOUT so CLI can extract it and connect to the dynamic port
+	fmt.Printf("gateway listening hostport %s\n", listener.Addr())
 
 	// basically expecting 1 connection, given the 1cli-1gw process pairing
 	s.log.Infow("Accepting connections", "where", hostport)
@@ -267,7 +271,6 @@ func (s *Server) Listen(hostport string) (func(), error) {
 		return nil, err
 	}
 
-	s.log.Infow("SSH listening", "port", "8022")
 	// Before use, a handshake must be performed on the incoming
 	// net.Conn.
 	conn, chans, reqs, err := ssh.NewServerConn(nConn, s.config)

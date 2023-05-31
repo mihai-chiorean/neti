@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/mihai-chiorean/neti/cli/cmd"
@@ -73,6 +75,12 @@ func sshclient(logger *zap.SugaredLogger) {
 	}
 	defer sshSession.Close()
 
+	outputPipe, err := sshSession.StdoutPipe()
+	if err != nil {
+		log.Fatalf("Failed to get server output pipe: %s", err)
+	}
+	outputScanner := bufio.NewScanner(outputPipe)
+
 	// Redirect the session's output to the local stdout
 	sshSession.Stdout = os.Stdout
 	sshSession.Stderr = os.Stderr
@@ -90,14 +98,33 @@ func sshclient(logger *zap.SugaredLogger) {
 	logger.Info("Waiting for the gw to start listening... (2 sec timer)")
 
 	time.Sleep(2 * time.Second)
+
+	serverPort := ""
+	for outputScanner.Scan() {
+		line := outputScanner.Text()
+
+		if strings.HasPrefix(line, "gateway listening hostport ") {
+			postStr := strings.TrimPrefix(line, "gateway listening hostport ")
+			_, serverPort, err = net.SplitHostPort(postStr)
+			if err != nil {
+				log.Fatalf("Failed to parse server port: %s", err)
+			}
+			break
+		}
+	}
+	if serverPort == "" {
+		log.Fatal("Failed to find server port in the output")
+	}
+
 	// Create a connection from server A to server B
-	connAB, err := connAuth.Dial("tcp", "127.0.0.1:8022")
+	gwHostport := fmt.Sprintf("127.0.0.1:%s", serverPort)
+	connAB, err := connAuth.Dial("tcp", gwHostport)
 	if err != nil {
 		log.Fatalf("Failed to connect to server B through server A: %s", err)
 	}
 
 	// Establish an SSH connection with server B using the connection from server A
-	connB, chans, reqs, err := ssh.NewClientConn(connAB, "127.0.0.1:8022", config)
+	connB, chans, reqs, err := ssh.NewClientConn(connAB, gwHostport, config)
 	if err != nil {
 		log.Fatalf("Failed to establish SSH connection with server B: %s", err)
 	}
@@ -109,7 +136,7 @@ func sshclient(logger *zap.SugaredLogger) {
 
 	// TODO this is a hack to wait for the command to be executed
 	// TODO if each user is connected to a different gw process, we need to figure out the listener port for each client to connect to
-	logger.Info("Dialing 8022")
+	logger.Infof("Dialing %s", serverPort)
 
 	// Dial your ssh server.
 	conn := ssh.NewClient(connB, chans, reqs)

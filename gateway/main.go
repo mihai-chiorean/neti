@@ -58,7 +58,7 @@ func main() {
 		log.Fatal(err)
 	}
 	logger.Info("Server ready")
-	_, err = s.Listen("0.0.0.0:8022")
+	_, err = s.Listen("0.0.0.0:0")
 	if err != nil {
 		logger.Error(err.Error())
 	}
