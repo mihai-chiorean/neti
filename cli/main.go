@@ -171,7 +171,7 @@ func sshclient(logger *zap.SugaredLogger) {
 	gwLogger.Start(conn)
 
 	httpProxyReq := api.HTTPProxyRequest{
-		ServiceHostPort: "dummy:80",
+		ServiceHostPort: "dummy:8080",
 	}
 
 	// TODO handle error
