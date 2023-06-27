@@ -1,0 +1,11 @@
+#!/bin/bash
+
+image=`docker-compose build | grep "writing image sha256" |  awk -F":" '{print $2}' | awk '{print $1}'`
+echo $image
+
+tag=registry.gitlab.com/mihai.v.chiorean/neti/neti-gateway:$1
+echo $tag
+
+docker tag $image $tag
+docker push $tag
+

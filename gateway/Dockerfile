@@ -8,6 +8,8 @@ RUN apt-get update && \
 RUN useradd -m testuser && \
     echo "testuser:tiger" | chpasswd
 
+RUN useradd -m probe && \
+    echo "probe:probe" | chpasswd
 # Configure SSH
 RUN mkdir /var/run/sshd && \
     echo 'Port 8023' >> /etc/ssh/sshd_config && \

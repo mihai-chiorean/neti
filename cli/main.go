@@ -41,7 +41,10 @@ import (
 )
 
 // Config -
-type Config struct{}
+type Config struct {
+	host string
+	port string
+}
 
 type logDecoder interface {
 	Decode(in io.Reader)
@@ -61,7 +64,8 @@ func sshclient(logger *zap.SugaredLogger) {
 	}
 
 	// Dial your ssh server.
-	connAuth, err := ssh.Dial("tcp", "127.0.0.1:8023", config)
+	connAuth, err := ssh.Dial("tcp", "a7be28a34b40e4b9b8da39f451765819-44965618e660adb0.elb.us-west-2.amazonaws.com:10023", config)
+	// connAuth, err := ssh.Dial("tcp", "127.0.0.1:8023", config)
 	if err != nil {
 		logger.Fatal(err, "unable to connect: ")
 	}

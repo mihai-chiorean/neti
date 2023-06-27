@@ -1,0 +1,4 @@
+#!/bin/zsh
+
+export NETI_GW=$(kubectl get services -n neti-testing | grep "neti-gateway-lb" | awk -v col="4" '{print $col}' "${@--}")
+echo $NETI_GW
