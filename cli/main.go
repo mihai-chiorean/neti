@@ -20,9 +20,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -50,17 +53,24 @@ type logDecoder interface {
 
 func sshclient(logger *zap.SugaredLogger) {
 
-	// TODO we need to make this work with a public key, not a password
-	logger.Info("Dialing 8023...")
+	// Load the private key
+	privateKeyPath := "private_unencrypted.pem"
+	signer, err := loadPrivateKey(privateKeyPath)
+	if err != nil {
+		log.Fatal("Failed to load private key:", err)
+	}
+
 	config := &ssh.ClientConfig{
 		User: "testuser",
 		Auth: []ssh.AuthMethod{
-			ssh.Password("tiger"),
+			// ssh.Password("tiger"),
+			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //hostKeyCallback, //ssh.FixedHostKey(hostKey),
 	}
 
 	// Dial your ssh server.
+	logger.Info("Dialing 8023...")
 	connAuth, err := ssh.Dial("tcp", "127.0.0.1:8023", config)
 	if err != nil {
 		logger.Fatal(err, "unable to connect: ")
@@ -187,7 +197,7 @@ func sshclient(logger *zap.SugaredLogger) {
 
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
-	p, _ := proxy.NewHTTPProxy(":8085", string(payload), proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
+	p, _ := proxy.NewHTTPProxy(fmt.Sprintf(":%s", cmd.ProxyPort), string(payload), proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
 		logger.Infow("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
 		if err != nil {
@@ -206,6 +216,30 @@ func sshclient(logger *zap.SugaredLogger) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
+}
+
+func loadPrivateKey(privateKeyPath string) (ssh.Signer, error) {
+	keyBytes, err := ioutil.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode(keyBytes)
+	if block == nil {
+		return nil, err
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return signer, nil
 }
 
 func madTCPProxyThing() {
@@ -275,7 +309,6 @@ func main() {
 	// logger.Fatal(err)
 	// }
 
-	sshclient(logger)
-
 	cmd.Execute()
+	sshclient(logger)
 }
