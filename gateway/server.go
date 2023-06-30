@@ -29,28 +29,27 @@ type Server struct {
 func NewServer(log *zap.SugaredLogger) (*Server, error) {
 	config := &ssh.ServerConfig{
 		// Remove to disable password auth.
-		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			// Should use constant-time compare (or better, salt+hash) in
-			// a production setting.
-			log.Infow("Checking handshake")
-			if c.User() == "testuser" && string(pass) == "tiger" {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("password rejected for %q", c.User())
-		},
+		// PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+		// 	// Should use constant-time compare (or better, salt+hash) in
+		// 	// a production setting.
+		// 	log.Infow("Checking handshake")
+		// 	if c.User() == "testuser" && string(pass) == "tiger" {
+		// 		return nil, nil
+		// 	}
+		// 	return nil, fmt.Errorf("password rejected for %q", c.User())
+		// },
 
 		// Remove to disable public key auth.
-		//	PublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
-		//		if authorizedKeysMap[string(pubKey.Marshal())] {
-		//			return &ssh.Permissions{
-		//				// Record the public key used for authentication.
-		//				Extensions: map[string]string{
-		//					"pubkey-fp": ssh.FingerprintSHA256(pubKey),
-		//				},
-		//			}, nil
-		//		}
-		//		return nil, fmt.Errorf("unknown public key for %q", c.User())
-		//	},
+		PublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
+			fmt.Println("Public key:", string(ssh.MarshalAuthorizedKey(pubKey)))
+
+			return &ssh.Permissions{
+				// Record the public key used for authentication.
+				Extensions: map[string]string{
+					"pubkey-fp": ssh.FingerprintSHA256(pubKey),
+				},
+			}, nil
+		},
 	}
 
 	privateBytes, err := ioutil.ReadFile("/run/secrets/id_rsa")
