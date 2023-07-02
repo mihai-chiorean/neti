@@ -14,15 +14,15 @@ RUN useradd -m probe && \
 RUN mkdir /var/run/sshd && \
     echo 'Port 8023' >> /etc/ssh/sshd_config && \
     echo 'PermitRootLogin no' >> /etc/ssh/sshd_config && \
-    echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config && \
+    echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && \
     echo 'AllowTcpForwarding yes' >> /etc/ssh/sshd_config && \
     echo 'PermitTunnel yes' >> /etc/ssh/sshd_config && \
     echo 'PermitTTY no' >> /etc/ssh/sshd_config && \
     echo 'Match User testuser' >> /etc/ssh/sshd_config 
-# && \
-# echo '    ForceCommand /bin/gateway' >> /etc/ssh/sshd_config
-
-
+    # && \
+    # echo 'LogLevel DEBUG3' >> /etc/ssh/sshd_config
+    # && \
+    # echo '    ForceCommand /bin/gateway' >> /etc/ssh/sshd_config
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -32,6 +32,10 @@ WORKDIR /app
 
 # Copy the source from the current directory to the Working Directory inside the container
 COPY ./ ./
+
+# Add public key to authorized_keys file to enable pubkey auth
+RUN mkdir /home/testuser/.ssh && \
+    ssh-keygen -y -f /app/private_unencrypted.pem > /home/testuser/.ssh/authorized_keys
 
 # Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
 RUN go mod download
@@ -50,4 +54,4 @@ EXPOSE 8023
 # CMD ["/bin/gateway"]
 
 # Start SSH server
-CMD ["/usr/sbin/sshd", "-D"]
+CMD ["/usr/sbin/sshd", "-De"]
