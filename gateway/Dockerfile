@@ -2,25 +2,31 @@ FROM golang:latest as gateway
 
 # Update and install packages
 RUN apt-get update && \
-    apt-get install -y openssh-server
+    apt-get install -y openssh-server && \
+    apt-get install sshpass
 
 # Create SSH user and set password (replace 'your_password' with a secure password)
 RUN useradd -m testuser && \
     echo "testuser:tiger" | chpasswd
 
+RUN useradd -m probe && \
+    echo "probe:probe" | chpasswd
+
 # Configure SSH
 RUN mkdir /var/run/sshd && \
     echo 'Port 8023' >> /etc/ssh/sshd_config && \
     echo 'PermitRootLogin no' >> /etc/ssh/sshd_config && \
+    echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config && \
     echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && \
     echo 'AllowTcpForwarding yes' >> /etc/ssh/sshd_config && \
     echo 'PermitTunnel yes' >> /etc/ssh/sshd_config && \
     echo 'PermitTTY no' >> /etc/ssh/sshd_config && \
-    echo 'Match User testuser' >> /etc/ssh/sshd_config 
-    # && \
-    # echo 'LogLevel DEBUG3' >> /etc/ssh/sshd_config
-    # && \
-    # echo '    ForceCommand /bin/gateway' >> /etc/ssh/sshd_config
+    echo 'Match User probe' >> /etc/ssh/sshd_config && \
+    echo '    PasswordAuthentication yes' >> /etc/ssh/sshd_config && \
+    echo 'Match User testuser' >> /etc/ssh/sshd_config && \
+    #  && \
+    #  echo 'LogLevel DEBUG3' >> /etc/ssh/sshd_config
+    echo '    ForceCommand /bin/gateway' >> /etc/ssh/sshd_config
 
 # Set the Current Working Directory inside the container
 WORKDIR /app

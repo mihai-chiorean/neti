@@ -1,0 +1,8 @@
+#!/bin/bash
+
+eksctl create cluster -f eks-cluster-template.yaml --auto-kubeconfig
+eksctl utils write-kubeconfig --cluster neti-testing 
+kubectl config set-context --current --namespace=neti-testing
+kubectl create namespace neti-testing
+kubectl apply -f secret.yaml
+kubectl apply -f neti-gw-deployment.yaml

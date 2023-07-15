@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neti-gateway
+  namespace: neti-testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neti-gateway
+  template:
+    metadata:
+      labels:
+        app: neti-gateway
+        instance-type: t4g.nano
+    spec:
+      imagePullSecrets:
+        - name: gitlab-registry
+      volumes:
+        - name: probe-key-volume
+          secret:
+            secretName: probe-key
+      containers:
+        - name: neti-gateway
+          image: registry.gitlab.com/mihai.v.chiorean/neti/neti-gateway:arm-sshpass-latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Gi"
+          ports:
+            - containerPort: 8023
+            - containerPort: 22
+          readinessProbe:
+            exec:
+              command:
+              - sh 
+              - -c
+              - | 
+                sshpass -p "probe" ssh -p "8023" -q -o StrictHostKeyChecking=no probe@localhost echo "ok"
+          volumeMounts:
+            - name: probe-key-volume
+              mountPath: "/etc/ssh/probe/probe.key"
+              subPath: probe.key
+            - name: probe-key-volume
+              mountPath: "/root/.ssh/probe.key"
+              subPath: probe.key
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dummy
+  namespace: neti-testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dummy
+  template:
+    metadata:
+      labels:
+        app: dummy
+        instance-type: t4g.nano
+    spec:
+      containers:
+        - name: dummy
+          image: eexit/mirror-http-server
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Gi"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neti-gateway-lb
+  namespace: neti-testing
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  selector:
+    app: neti-gateway
+  ports:
+    - protocol: TCP
+      port: 10023
+      targetPort: 8023
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dummy
+spec:
+  selector:
+    app: dummy
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080

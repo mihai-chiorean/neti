@@ -52,7 +52,8 @@ func NewServer(log *zap.SugaredLogger) (*Server, error) {
 		},
 	}
 
-	privateBytes, err := ioutil.ReadFile("/run/secrets/id_rsa")
+	// privateBytes, err := ioutil.ReadFile("/run/secrets/id_rsa")
+	privateBytes, err := ioutil.ReadFile("/etc/ssh/ssh_host_rsa_key")
 	if err != nil {
 		return nil, err
 	}
