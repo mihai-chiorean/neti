@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -42,7 +41,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var cfgFile string
 var ProxyPort string
 var GatewayHost string
 
@@ -67,12 +65,17 @@ to quickly create a Cobra application.`,
 }
 
 func getConfig() *config.Config {
-	conf := &config.Config{}
-	err := viper.Unmarshal(conf)
+	conf := config.Config{}
+	err := viper.Unmarshal(&conf)
 	if err != nil {
 		fmt.Printf("Unable to decode into config struct, %v", err)
 	}
-	return conf
+
+	fmt.Println(viper.GetString("port"))
+	fmt.Println(viper.GetString("gateway"))
+	fmt.Println(viper.GetString("private_key_path"))
+	fmt.Println(conf)
+	return &conf
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -81,21 +84,18 @@ func Execute(cmd *cobra.Command) {
 	cobra.CheckErr(cmd.Execute())
 }
 
-type logDecoder interface {
-	Decode(in io.Reader)
-	Log([]byte)
-}
-
 func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 
 	// Load the private key
-	privateKeyPath := "private_unencrypted.pem"
-	signer, err := loadPrivateKey(privateKeyPath, logger)
+	// privateKeyPath := "private_unencrypted.pem"
+	logger.Infof("Loading private key from: %s", cliConfig.PrivateKeyPath)
+	signer, err := loadPrivateKey(cliConfig.PrivateKeyPath, logger)
 	if err != nil {
-		log.Fatal("Failed to load private key:", err)
+		// TODO - log.Fatal is not the best way to handle this - return an error and do "fatals" in main
+		logger.Fatal("Failed to load private key:", err)
 	}
 
-	config := &ssh.ClientConfig{
+	sshConfig := &ssh.ClientConfig{
 		User: "testuser",
 		Auth: []ssh.AuthMethod{
 			// ssh.Password("tiger"),
@@ -106,7 +106,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 
 	// Dial your ssh server.
 	logger.Infof("Connecting to gateway: %s", cliConfig.Gateway)
-	connAuth, err := ssh.Dial("tcp", cliConfig.Gateway, config)
+	connAuth, err := ssh.Dial("tcp", cliConfig.Gateway, sshConfig)
 	if err != nil {
 		logger.Fatal(err, "unable to connect: ")
 	}
@@ -116,12 +116,14 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	// Perform the SSH handshake
 	sshSession, err := connAuth.NewSession()
 	if err != nil {
+		// TODO - log.Fatal is not the best way to handle this - return an error and do "fatals" in main
 		log.Fatalf("Failed to create SSH session: %s", err)
 	}
 	defer sshSession.Close()
 
 	outputPipe, err := sshSession.StdoutPipe()
 	if err != nil {
+		// TODO - log.Fatal is not the best way to handle this - return an error and do "fatals" in main
 		log.Fatalf("Failed to get server output pipe: %s", err)
 	}
 	outputScanner := bufio.NewScanner(outputPipe)
@@ -132,6 +134,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 
 	logger.Info("Echo to session")
 
+	// TODO - is this needed if the force command is set up in the server ssh config?
 	// Start the session and wait for the force command to be executed
 	// Need this to be in a goroutine because it will block until the command is done
 	go func() {
@@ -169,7 +172,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	}
 
 	// Establish an SSH connection with server B using the connection from server A
-	connB, chans, reqs, err := ssh.NewClientConn(connAB, gwHostport, config)
+	connB, chans, reqs, err := ssh.NewClientConn(connAB, gwHostport, sshConfig)
 	if err != nil {
 		log.Fatalf("Failed to establish SSH connection with server B: %s", err)
 	}
