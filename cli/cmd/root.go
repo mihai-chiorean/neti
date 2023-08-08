@@ -23,7 +23,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -71,10 +70,6 @@ func getConfig() *config.Config {
 		fmt.Printf("Unable to decode into config struct, %v", err)
 	}
 
-	fmt.Println(viper.GetString("port"))
-	fmt.Println(viper.GetString("gateway"))
-	fmt.Println(viper.GetString("private_key_path"))
-	fmt.Println(conf)
 	return &conf
 }
 
@@ -91,7 +86,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	logger.Infof("Loading private key from: %s", cliConfig.PrivateKeyPath)
 	signer, err := loadPrivateKey(cliConfig.PrivateKeyPath, logger)
 	if err != nil {
-		// TODO - log.Fatal is not the best way to handle this - return an error and do "fatals" in main
+		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
 		logger.Fatal("Failed to load private key:", err)
 	}
 
@@ -116,15 +111,15 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	// Perform the SSH handshake
 	sshSession, err := connAuth.NewSession()
 	if err != nil {
-		// TODO - log.Fatal is not the best way to handle this - return an error and do "fatals" in main
-		log.Fatalf("Failed to create SSH session: %s", err)
+		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
+		logger.Fatalf("Failed to create SSH session: %s", err)
 	}
 	defer sshSession.Close()
 
 	outputPipe, err := sshSession.StdoutPipe()
 	if err != nil {
-		// TODO - log.Fatal is not the best way to handle this - return an error and do "fatals" in main
-		log.Fatalf("Failed to get server output pipe: %s", err)
+		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
+		logger.Fatalf("Failed to get server output pipe: %s", err)
 	}
 	outputScanner := bufio.NewScanner(outputPipe)
 
@@ -139,7 +134,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	// Need this to be in a goroutine because it will block until the command is done
 	go func() {
 		if err = sshSession.Run("/bin/gateway "); err != nil {
-			log.Fatalf("Failed to execute command: %s", err)
+			logger.Fatalf("Failed to execute command: %s", err)
 		}
 	}()
 
@@ -155,26 +150,26 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 			postStr := strings.TrimPrefix(line, "gateway listening hostport ")
 			_, serverPort, err = net.SplitHostPort(postStr)
 			if err != nil {
-				log.Fatalf("Failed to parse server port: %s", err)
+				logger.Fatalf("Failed to parse server port: %s", err)
 			}
 			break
 		}
 	}
 	if serverPort == "" {
-		log.Fatal("Failed to find server port in the output")
+		logger.Fatal("Failed to find server port in the output")
 	}
 
 	// Create a connection from server A to server B
 	gwHostport := fmt.Sprintf("127.0.0.1:%s", serverPort)
 	connAB, err := connAuth.Dial("tcp", gwHostport)
 	if err != nil {
-		log.Fatalf("Failed to connect to server B through server A: %s", err)
+		logger.Fatalf("Failed to connect to server B through server A: %s", err)
 	}
 
 	// Establish an SSH connection with server B using the connection from server A
 	connB, chans, reqs, err := ssh.NewClientConn(connAB, gwHostport, sshConfig)
 	if err != nil {
-		log.Fatalf("Failed to establish SSH connection with server B: %s", err)
+		logger.Fatalf("Failed to establish SSH connection with server: %s", err)
 	}
 	defer connB.Close()
 
