@@ -41,8 +41,6 @@ func NewServer(log *zap.SugaredLogger) (*Server, error) {
 
 		// Remove to disable public key auth.
 		PublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
-			fmt.Println("Public key:", string(ssh.MarshalAuthorizedKey(pubKey)))
-
 			return &ssh.Permissions{
 				// Record the public key used for authentication.
 				Extensions: map[string]string{
@@ -52,7 +50,6 @@ func NewServer(log *zap.SugaredLogger) (*Server, error) {
 		},
 	}
 
-	// privateBytes, err := ioutil.ReadFile("/run/secrets/id_rsa")
 	privateBytes, err := ioutil.ReadFile("/etc/ssh/ssh_host_rsa_key")
 	if err != nil {
 		return nil, err
