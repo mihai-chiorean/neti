@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"github.com/mihai-chiorean/neti/cli/cmd"
-	"github.com/mihai-chiorean/neti/cli/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -43,6 +42,7 @@ func initConfig() {
 
 		// Search config in home directory with name ".cli" (without extension).
 		viper.AddConfigPath(home)
+		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".cli")
 	}
@@ -50,12 +50,13 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println(err.Error())
 	}
-
+	fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
 	viper.BindPFlag("gateway", rootCmd.PersistentFlags().Lookup("gateway"))
+	viper.BindPFlag("private_key_path", rootCmd.PersistentFlags().Lookup("key"))
 }
 
 func main() {
@@ -72,6 +73,7 @@ func main() {
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringP("port", "p", "8085", "port for http proxy to listen on")
 	rootCmd.PersistentFlags().StringP("gateway", "g", "", "gateway hostport")
+	rootCmd.PersistentFlags().StringP("key", "k", "", "private key file")
 
 	cobra.OnInitialize(initConfig)
 
@@ -81,13 +83,4 @@ func main() {
 
 	cmd.Execute(rootCmd)
 	// sshclient(logger)
-}
-
-func getConfig() *config.Config {
-	conf := &config.Config{}
-	err := viper.Unmarshal(conf)
-	if err != nil {
-		fmt.Printf("Unable to decode into config struct, %v", err)
-	}
-	return conf
 }

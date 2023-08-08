@@ -88,12 +88,35 @@ for the client to display.
 
 Lazily initializes an http proxy on the gateway side.
 
+
+## Command line
+
+```
+A longer description that spans multiple lines and likely contains
+examples and usage of using your application. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.
+
+Usage:
+  cli [flags]
+
+Flags:
+  -c, --config string    config file (default is .cli.yaml) (default ".cli.yaml")
+  -g, --gateway string   gateway hostport
+  -h, --help             help for cli
+  -k, --key string       private key file
+  -p, --port string      port for http proxy to listen on (default "8085")
+  -t, --toggle           Help message for toggle
+```
+
 # Useful links
 
 - https://istio.io/latest/docs/tasks/traffic-management/request-routing/
 
+
 # TODO:
 
-## 1. Setup a DNS server
+## 1. Docs on how to run and test
 
-## 2. Docs on how to run and test

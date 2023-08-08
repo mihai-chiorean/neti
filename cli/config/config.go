@@ -2,6 +2,7 @@ package config
 
 // Config -
 type Config struct {
-	Gateway string `yaml:"gateway"`
-	Port    string `yaml:"port"`
+	Gateway        string `mapstructure:"gateway"`
+	Port           string `mapstructure:"port"`
+	PrivateKeyPath string `mapstructure:"private_key_path"`
 }
