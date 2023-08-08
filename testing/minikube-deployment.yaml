@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neti-gateway
+  namespace: neti-testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neti-gateway
+  template:
+    metadata:
+      labels:
+        app: neti-gateway
+    spec:
+      containers:
+        - name: neti-gateway
+          image: neti-gateway
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8023
+            - containerPort: 22
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dummy
+  namespace: neti-testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dummy
+  template:
+    metadata:
+      labels:
+        app: dummy
+    spec:
+      containers:
+        - name: dummy
+          image: eexit/mirror-http-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neti-gateway-lb
+  namespace: neti-testing
+spec:
+  selector:
+    app: neti-gateway
+  ports:
+    - protocol: TCP
+      port: 10023
+      targetPort: 8023
+  type: LoadBalancer
