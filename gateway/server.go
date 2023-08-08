@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/mihai-chiorean/neti/gateway/api"
@@ -50,7 +50,7 @@ func NewServer(log *zap.SugaredLogger) (*Server, error) {
 		},
 	}
 
-	privateBytes, err := ioutil.ReadFile("/etc/ssh/ssh_host_rsa_key")
+	privateBytes, err := os.ReadFile("/etc/ssh/ssh_host_rsa_key")
 	if err != nil {
 		return nil, err
 	}

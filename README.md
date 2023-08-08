@@ -1,4 +1,4 @@
-[![Coverage Status](https://coveralls.io/repos/github/mihai-chiorean/neti/badge.svg?t=aPQhoi)](https://coveralls.io/github/mihai-chiorean/neti)
+[![codecov](https://codecov.io/gh/mihai-chiorean/neti/branch/main/graph/badge.svg?token=QCDQGK7GEX)](https://codecov.io/gh/mihai-chiorean/neti)
 
 # Name
 
