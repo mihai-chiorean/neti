@@ -50,7 +50,7 @@ func NewServer(log *zap.SugaredLogger) (*Server, error) {
 		},
 	}
 
-	privateBytes, err := os.ReadFile("/etc/ssh/ssh_host_rsa_key")
+	privateBytes, err := os.ReadFile("/etc/ssh/probe/probe.key")
 	if err != nil {
 		return nil, err
 	}

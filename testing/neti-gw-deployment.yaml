@@ -20,6 +20,9 @@ spec:
         - name: probe-key-volume
           secret:
             secretName: probe-key
+            items:
+              - key: probe_id_rsa
+                path: probe.key
       containers:
         - name: neti-gateway
           image: registry.gitlab.com/mihai.v.chiorean/neti/neti-gateway:arm-sshpass-latest
@@ -46,7 +49,7 @@ spec:
               mountPath: "/etc/ssh/probe/probe.key"
               subPath: probe.key
             - name: probe-key-volume
-              mountPath: "/root/.ssh/probe.key"
+              mountPath: "/neti/probe.key"
               subPath: probe.key
 ---
 apiVersion: apps/v1
