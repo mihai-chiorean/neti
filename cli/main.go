@@ -65,7 +65,7 @@ func main() {
 	zapCfg := zap.NewDevelopmentConfig()
 	zapCfg.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 	lp, _ := zapCfg.Build()
-	logger := lp.Sugar()
+	logger := lp.Named("CLI").Sugar()
 	defer logger.Sync()
 
 	rootCmd = cmd.NewRootCmd(logger)

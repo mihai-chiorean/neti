@@ -302,7 +302,7 @@ func (s *Server) Listen(hostport string) (func(), error) {
 						req.Reply(req.Type == "shell", nil)
 					}
 				}(requests)
-				gwLogger := logger.Desugar().WithOptions(newToClientLogger(channel)).Sugar()
+				gwLogger := logger.Desugar().Named("GW").WithOptions(newToClientLogger(channel)).Sugar()
 				gwLogger.Debug("Gateway logger ok")
 			}
 		case "direct-tcpip":

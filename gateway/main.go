@@ -46,7 +46,7 @@ func main() {
 	zapConfig := zap.NewDevelopmentConfig()
 	zapConfig.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 	pl, _ := zapConfig.Build()
-	logger := pl.Sugar()
+	logger := pl.Named("GW").Sugar()
 	defer logger.Sync()
 
 	_, err := readKeys()

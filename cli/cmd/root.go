@@ -208,7 +208,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	}
 	logger.Debug("Handshake received", "payload", handshakeRes)
 
-	gwLogger := logging.NewGatewayLogger(zapcore.InfoLevel, handshakeRes.LoggerListener, logger.Named("GATEWAY").Desugar())
+	gwLogger := logging.NewGatewayLogger(zapcore.InfoLevel, handshakeRes.LoggerListener, logger.Desugar().Named("GATEWAY"))
 	gwLogger.Start(conn)
 
 	httpProxyReq := api.HTTPProxyRequest{
@@ -229,12 +229,12 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
 	p, _ := proxy.NewHTTPProxy(fmt.Sprintf(":%s", cliConfig.Port), string(payload), proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
-		logger.Debugw("Dialing...", "addr", addr)
+		logger.Infow("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
 		if err != nil {
 			return nil, err
 		}
-		logger.Infow("TCP connection established", "remote", addr)
+		logger.Infow("Have tcp connection", "remote", newChannel.RemoteAddr().String())
 
 		return newChannel, nil
 	}), logger)
