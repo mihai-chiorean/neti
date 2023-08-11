@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
@@ -83,7 +82,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 
 	// Load the private key
 	// privateKeyPath := "private_unencrypted.pem"
-	logger.Infof("Loading private key from: %s", cliConfig.PrivateKeyPath)
+	logger.Debugf("Loading private key from: %s", cliConfig.PrivateKeyPath)
 	signer, err := loadPrivateKey(cliConfig.PrivateKeyPath, logger)
 	if err != nil {
 		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
@@ -107,7 +106,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	}
 	defer connAuth.Close()
 
-	logger.Info("Starting SSH session")
+	logger.Debug("Starting SSH session")
 	// Perform the SSH handshake
 	sshSession, err := connAuth.NewSession()
 	if err != nil {
@@ -127,12 +126,11 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	sshSession.Stdout = os.Stdout
 	sshSession.Stderr = os.Stderr
 
-	logger.Info("Echo to session")
-
 	// TODO - is this needed if the force command is set up in the server ssh config?
 	// Start the session and wait for the force command to be executed
 	// Need this to be in a goroutine because it will block until the command is done
 	go func() {
+		logger.Debug("Starting the gateway")
 		if err = sshSession.Run("/bin/gateway "); err != nil {
 			logger.Fatalf("Failed to execute command: %s", err)
 		}
@@ -179,7 +177,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 
 	// TODO this is a hack to wait for the command to be executed
 	// TODO if each user is connected to a different gw process, we need to figure out the listener port for each client to connect to
-	logger.Infof("Dialing %s", serverPort)
+	logger.Debugf("Dialing %s", serverPort)
 
 	// Dial your ssh server.
 	conn := ssh.NewClient(connB, chans, reqs)
@@ -188,7 +186,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	// }
 	defer conn.Close()
 
-	logger.Info("Sending handshake to gateway")
+	logger.Debug("Sending handshake to gateway")
 	handshake := api.HandshakeRequest{
 		LoggerAddr: ":0",
 	}
@@ -201,16 +199,16 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	logger.Info("Handshake?")
+	logger.Debug("Handshake?")
 
 	// this is the handshake response; it will expose the port logs come on
 	var handshakeRes api.Handshake
 	if err := json.Unmarshal(payload, &handshakeRes); err != nil {
 		logger.Fatal(err)
 	}
-	logger.Info("Handshake received", "payload", handshakeRes)
+	logger.Debug("Handshake received", "payload", handshakeRes)
 
-	gwLogger := logging.NewGatewayLogger(zapcore.DebugLevel, handshakeRes.LoggerListener, logger.Named("GATEWAY").Desugar())
+	gwLogger := logging.NewGatewayLogger(zapcore.InfoLevel, handshakeRes.LoggerListener, logger.Named("GATEWAY").Desugar())
 	gwLogger.Start(conn)
 
 	httpProxyReq := api.HTTPProxyRequest{
@@ -226,7 +224,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 		logger.Fatal(err)
 	}
 
-	logger.Info("addr", payload, "Received http proxy payload")
+	logger.With("payload", string(payload)).Info("Received http proxy payload")
 
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
@@ -252,7 +250,7 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 }
 
 func loadPrivateKey(privateKeyPath string, logger *zap.SugaredLogger) (ssh.Signer, error) {
-	keyBytes, err := ioutil.ReadFile(privateKeyPath)
+	keyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return nil, err
 	}

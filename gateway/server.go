@@ -99,16 +99,15 @@ func (s *Server) routeRequests(in <-chan *ssh.Request) {
 // logs to the client
 func (s *Server) handshake(req *ssh.Request) {
 	h := api.Handshake{
-		Success: "yeahhh",
+		Success: "pong",
 	}
 	var hr api.HandshakeRequest
 	if err := json.Unmarshal(req.Payload, &hr); err != nil {
 		s.log.Error(err)
-		h.Success = "nooo, json, noo"
+		h.Success = "json unmarshal error"
 	}
 
-	s.log.Infow(string(req.Payload))
-	s.log.Infow("Handshake req unpacked")
+	s.log.Debugw("Handshake req unpacked", string(req.Payload))
 
 	ll, err := net.Listen("tcp", hr.LoggerAddr)
 	if err != nil {
@@ -116,7 +115,7 @@ func (s *Server) handshake(req *ssh.Request) {
 		req.Reply(false, nil)
 	}
 	h.LoggerListener = ll.Addr().String()
-	s.log.Infow("Listening for log connections", "addr", ll.Addr().String())
+	s.log.Debugw("Listening for log connections", "addr", ll.Addr().String())
 	s.proxies[ll.Addr().String()] = ll
 	go func() {
 		conn, err := ll.Accept()
@@ -125,10 +124,9 @@ func (s *Server) handshake(req *ssh.Request) {
 			return
 		}
 
-		s.log.Info("Rerouting logs to client")
+		s.log.Debug("Rerouting logs to client")
 		s.log = s.log.Desugar().WithOptions(newToClientLogger(conn)).Sugar()
-
-		s.log.Info("Logs rerouted to client")
+		s.log.Debug("Logs rerouted to client")
 	}()
 	payload, err := json.Marshal(&h)
 	if err != nil {
@@ -195,7 +193,7 @@ func (s *Server) proxyTCP(dest string, ch io.ReadWriteCloser) error {
 		defer ch.Close()
 		defer dconn.Close()
 		io.Copy(dconn, ch)
-		s.log.Info("Closing tcp proxy <-")
+		s.log.Debug("Closing tcp proxy <-")
 	}()
 
 	return nil
@@ -235,7 +233,7 @@ func (s *Server) handleDirectTCP(newChannel ssh.NewChannel) {
 		logger.Errorw("Failed to open TCP proxy", "error", err)
 		return
 	}
-	logger.Info("Dialer started")
+	logger.Debug("Dialer started")
 }
 
 func newToClientLogger(w io.Writer) zap.Option {
@@ -243,7 +241,7 @@ func newToClientLogger(w io.Writer) zap.Option {
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	consoleEncoder := zapcore.NewJSONEncoder(encoderConfig)
 	return zap.WrapCore(func(core zapcore.Core) zapcore.Core {
-		return zapcore.NewCore(consoleEncoder, zapcore.AddSync(w), zapcore.DebugLevel)
+		return zapcore.NewCore(consoleEncoder, zapcore.AddSync(w), zapcore.InfoLevel)
 	})
 }
 
@@ -256,7 +254,7 @@ func (s *Server) Listen(hostport string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	s.log.Infow("gateway listening", "hostport", listener.Addr())
+	s.log.Infow("Gateway listening", "hostport", listener.Addr())
 
 	// prints hostport to STDOUT so CLI can extract it and connect to the dynamic port
 	fmt.Printf("gateway listening hostport %s\n", listener.Addr())
@@ -281,10 +279,8 @@ func (s *Server) Listen(hostport string) (func(), error) {
 	logger := s.log
 	// Service the incoming Channel channel.
 	for newChannel := range chans {
-		logger.Infow("New channel opened",
-			"type", newChannel.ChannelType(),
-			"data", string(newChannel.ExtraData()),
-		)
+		logger.Infow("New channel opened") // "type", newChannel.ChannelType(),
+		// "data", string(newChannel.ExtraData()),
 
 		// Channels have a type, depending on the application level
 		// protocol intended. In the case of a shell, the type is
@@ -307,7 +303,7 @@ func (s *Server) Listen(hostport string) (func(), error) {
 					}
 				}(requests)
 				gwLogger := logger.Desugar().WithOptions(newToClientLogger(channel)).Sugar()
-				gwLogger.Info("We have a new gateway logger!!")
+				gwLogger.Debug("Gateway logger ok")
 			}
 		case "direct-tcpip":
 			{
