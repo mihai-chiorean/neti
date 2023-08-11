@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var cfgFile string
@@ -61,7 +62,9 @@ func initConfig() {
 
 func main() {
 
-	lp, _ := zap.NewDevelopment()
+	zapCfg := zap.NewDevelopmentConfig()
+	zapCfg.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	lp, _ := zapCfg.Build()
 	logger := lp.Sugar()
 	defer logger.Sync()
 

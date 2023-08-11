@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -42,7 +43,9 @@ type localForwardChannelData struct {
 // TODO custom zap core logger that can send logs over the channel
 // TODO
 func main() {
-	pl, _ := zap.NewDevelopment()
+	zapConfig := zap.NewDevelopmentConfig()
+	zapConfig.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	pl, _ := zapConfig.Build()
 	logger := pl.Sugar()
 	defer logger.Sync()
 
