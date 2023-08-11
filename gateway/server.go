@@ -146,7 +146,7 @@ func (s *Server) newHTTPProxy(req *ssh.Request) {
 
 	target := httpProxyReq.ServiceHostPort
 	log := s.log.Named("gateway_proxy").With("target", target)
-	log.Infow("Opening new HTTP handler")
+	log.Debugw("Opening new HTTP handler")
 
 	// TODO Replace with new http proxy; the request should have some
 	//		the request should have some destination service name or port

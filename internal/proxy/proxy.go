@@ -38,7 +38,7 @@ type HTTPProxy struct {
 // and this would be where we'd expect to add logic fo allow/denylist, rate limiting, record/replay.
 func (p *HTTPProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	log := p.log.With("method", req.Method, "host", req.Host, "remote", req.RemoteAddr, "url", req.RequestURI, "requrl", req.URL)
-	log.Debugw("Received request")
+	log.Infow("Received request")
 
 	// step 1: create outgoing request
 	outReq := new(http.Request)
@@ -57,7 +57,7 @@ func (p *HTTPProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	log.Debug("Calling transport")
 
-	log.Debugw("Outreq:",
+	log.Infow("Outgoing request:",
 		"target_uri", outReq.RequestURI,
 		"target_url", outReq.URL,
 		"requri", req.RequestURI,
