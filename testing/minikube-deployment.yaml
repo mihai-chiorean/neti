@@ -13,6 +13,10 @@ spec:
       labels:
         app: neti-gateway
     spec:
+      volumes:
+        - name: probe-key-volume
+          secret:
+            secretName: probe-key
       containers:
         - name: neti-gateway
           image: neti-gateway
@@ -20,6 +24,9 @@ spec:
           ports:
             - containerPort: 8023
             - containerPort: 22
+          volumeMounts:
+            - name: probe-key-volume
+              mountPath: "/etc/ssh/probe"
 ---
 apiVersion: apps/v1
 kind: Deployment
