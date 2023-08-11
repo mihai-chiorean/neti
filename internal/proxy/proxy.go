@@ -40,6 +40,12 @@ func (p *HTTPProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	log := p.log.With("method", req.Method, "host", req.Host, "remote", req.RemoteAddr, "url", req.RequestURI, "requrl", req.URL)
 	log.Infow("Received request")
 
+	_, ok := req.Header["X-Testing-Demo"]
+	if ok {
+		log.Infow("Request blocked")
+		return
+	}
+
 	// step 1: create outgoing request
 	outReq := new(http.Request)
 	*outReq = *req // this only does shallow copies of maps
