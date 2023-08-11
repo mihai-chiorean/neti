@@ -229,12 +229,12 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
 	p, _ := proxy.NewHTTPProxy(fmt.Sprintf(":%s", cliConfig.Port), string(payload), proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
-		logger.Infow("Dialing...", "addr", addr)
+		logger.Debugw("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
 		if err != nil {
 			return nil, err
 		}
-		logger.Infow("Have tcp connection", "remote", newChannel.RemoteAddr().String())
+		logger.Infow("TCP connection established", "remote", addr)
 
 		return newChannel, nil
 	}), logger)
@@ -262,7 +262,7 @@ func loadPrivateKey(privateKeyPath string, logger *zap.SugaredLogger) (ssh.Signe
 	}
 
 	logger.Debug("Decoded private key")
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, err
 	}
