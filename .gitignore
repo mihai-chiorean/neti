@@ -1,2 +1,4 @@
 private.pem
 private-unencrypted.pem
+.env
+.vscode
