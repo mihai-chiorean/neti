@@ -13,5 +13,3 @@ func TestNewSSHClient(t *testing.T) {
 	c := NewSSHClient(&ssh.ClientConfig{}, l.Sugar())
 	assert.NotNil(t, c)
 }
-
-func Test
