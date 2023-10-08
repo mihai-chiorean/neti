@@ -16,48 +16,60 @@ limitations under the License.
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
-	"strings"
-	"time"
 
 	"github.com/mihai-chiorean/neti/cli/config"
-	"github.com/mihai-chiorean/neti/cli/logging"
-	"github.com/mihai-chiorean/neti/gateway/api"
+	netissh "github.com/mihai-chiorean/neti/cli/ssh"
 	"github.com/mihai-chiorean/neti/internal/proxy"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/ssh"
 )
 
 var ProxyPort string
 var GatewayHost string
 
+type netiClient interface {
+	DialBastion(hostport string) error
+	StartGateway() (string, error)
+	DialGateway(gwHostport string) (*ssh.Client, error)
+	Handshake() error
+	CreateHTTPProxy(string) (string, error)
+}
+
 func NewRootCmd(logger *zap.SugaredLogger) *cobra.Command {
 	// rootCmd represents the base command when called without any subcommands
 	return &cobra.Command{
-		Use:   "cli",
-		Short: "A brief description of your application",
-		Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-		// Uncomment the following line if your bare application
-		// has an action associated with it:
+		Use:   "neti",
+		Short: "Neti is the client to connect the the neti gateway and route local traffic to remote services",
+		Long:  ``,
 		Run: func(cmd *cobra.Command, args []string) {
 			config := getConfig()
-			sshclient(logger, config)
+			// Load the private key
+			logger.Debugf("Loading private key from: %s", config.PrivateKeyPath)
+			signer, err := loadPrivateKey(config.PrivateKeyPath, logger)
+			if err != nil {
+				logger.Error("Failed to load private key:", err)
+			}
+
+			sshConfig := &ssh.ClientConfig{
+				User: "testuser",
+				Auth: []ssh.AuthMethod{
+					ssh.PublicKeys(signer),
+				},
+				// TODO what's up with this?
+				HostKeyCallback: ssh.InsecureIgnoreHostKey(), //hostKeyCallback, //ssh.FixedHostKey(hostKey),
+			}
+
+			c := netissh.NewSSHClient(sshConfig, logger)
+			start(c, logger, config)
 		},
 	}
 }
@@ -78,157 +90,39 @@ func Execute(cmd *cobra.Command) {
 	cobra.CheckErr(cmd.Execute())
 }
 
-func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
-
-	// Load the private key
-	// privateKeyPath := "private_unencrypted.pem"
-	logger.Debugf("Loading private key from: %s", cliConfig.PrivateKeyPath)
-	signer, err := loadPrivateKey(cliConfig.PrivateKeyPath, logger)
-	if err != nil {
-		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
-		logger.Fatal("Failed to load private key:", err)
-	}
-
-	sshConfig := &ssh.ClientConfig{
-		User: "testuser",
-		Auth: []ssh.AuthMethod{
-			// ssh.Password("tiger"),
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //hostKeyCallback, //ssh.FixedHostKey(hostKey),
-	}
+func start(c netiClient, logger *zap.SugaredLogger, cliConfig *config.Config) error {
 
 	// Dial your ssh server.
-	logger.Infof("Connecting to gateway: %s", cliConfig.Gateway)
-	connAuth, err := ssh.Dial("tcp", cliConfig.Gateway, sshConfig)
+	if err := c.DialBastion(cliConfig.Gateway); err != nil {
+		logger.Error(err)
+		return err
+	}
+
+	serverPort, err := c.StartGateway()
 	if err != nil {
-		logger.Fatal(err, "unable to connect: ")
-	}
-	defer connAuth.Close()
-
-	logger.Debug("Starting SSH session")
-	// Perform the SSH handshake
-	sshSession, err := connAuth.NewSession()
-	if err != nil {
-		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
-		logger.Fatalf("Failed to create SSH session: %s", err)
-	}
-	defer sshSession.Close()
-
-	outputPipe, err := sshSession.StdoutPipe()
-	if err != nil {
-		// TODO - logger.Fatal is not the best way to handle this - return an error and do "fatals" in main
-		logger.Fatalf("Failed to get server output pipe: %s", err)
-	}
-	outputScanner := bufio.NewScanner(outputPipe)
-
-	// Redirect the session's output to the local stdout
-	sshSession.Stdout = os.Stdout
-	sshSession.Stderr = os.Stderr
-
-	// TODO - is this needed if the force command is set up in the server ssh config?
-	// Start the session and wait for the force command to be executed
-	// Need this to be in a goroutine because it will block until the command is done
-	go func() {
-		logger.Debug("Starting the gateway")
-		if err = sshSession.Run("/bin/gateway "); err != nil {
-			logger.Fatalf("Failed to execute command: %s", err)
-		}
-	}()
-
-	logger.Info("Waiting for the gw to start listening... (2 sec timer)")
-
-	time.Sleep(2 * time.Second)
-
-	serverPort := ""
-	for outputScanner.Scan() {
-		line := outputScanner.Text()
-
-		if strings.HasPrefix(line, "gateway listening hostport ") {
-			postStr := strings.TrimPrefix(line, "gateway listening hostport ")
-			_, serverPort, err = net.SplitHostPort(postStr)
-			if err != nil {
-				logger.Fatalf("Failed to parse server port: %s", err)
-			}
-			break
-		}
-	}
-	if serverPort == "" {
-		logger.Fatal("Failed to find server port in the output")
+		logger.Fatalf("Could not start gateway", err)
 	}
 
 	// Create a connection from server A to server B
 	gwHostport := fmt.Sprintf("127.0.0.1:%s", serverPort)
-	connAB, err := connAuth.Dial("tcp", gwHostport)
+	conn, err := c.DialGateway(gwHostport)
 	if err != nil {
-		logger.Fatalf("Failed to connect to server B through server A: %s", err)
+		return err
 	}
-
-	// Establish an SSH connection with server B using the connection from server A
-	connB, chans, reqs, err := ssh.NewClientConn(connAB, gwHostport, sshConfig)
-	if err != nil {
-		logger.Fatalf("Failed to establish SSH connection with server: %s", err)
-	}
-	defer connB.Close()
-
-	// Create an SSH client from the connection with server B
-	clientB := ssh.NewClient(connB, chans, reqs)
-	defer clientB.Close()
-
-	// TODO this is a hack to wait for the command to be executed
-	// TODO if each user is connected to a different gw process, we need to figure out the listener port for each client to connect to
-	logger.Debugf("Dialing %s", serverPort)
-
-	// Dial your ssh server.
-	conn := ssh.NewClient(connB, chans, reqs)
-	// if err != nil {
-	// 	logger.Fatal(err, "unable to connect: ")
-	// }
-	defer conn.Close()
 
 	logger.Debug("Sending handshake to gateway")
-	handshake := api.HandshakeRequest{
-		LoggerAddr: ":0",
+	if err := c.Handshake(); err != nil {
+		return err
 	}
-	// TODO handle error
-	body, _ := json.Marshal(&handshake)
 
-	// this is an "ssh request"; the body will likely expand with other things
-	// TODO we need these api names - like Handshake - in some static form
-	_, payload, err := conn.SendRequest("Handshake", true, body)
+	proxyHost, err := c.CreateHTTPProxy("dummy:8080")
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
-	logger.Debug("Handshake?")
-
-	// this is the handshake response; it will expose the port logs come on
-	var handshakeRes api.Handshake
-	if err := json.Unmarshal(payload, &handshakeRes); err != nil {
-		logger.Fatal(err)
-	}
-	logger.Debug("Handshake received", "payload", handshakeRes)
-
-	gwLogger := logging.NewGatewayLogger(zapcore.InfoLevel, handshakeRes.LoggerListener, logger.Desugar().Named("GATEWAY"))
-	gwLogger.Start(conn)
-
-	httpProxyReq := api.HTTPProxyRequest{
-		ServiceHostPort: "dummy:8080",
-	}
-
-	// TODO handle error
-	body, _ = json.Marshal(&httpProxyReq)
-
-	// this is another api that the gateway provides. At the moment there is no payload schema for it
-	_, payload, err = conn.SendRequest("NewHTTPProxy", true, body)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	logger.With("payload", string(payload)).Info("Received http proxy payload")
 
 	// Serve HTTP with your SSH server acting as a reverse proxy.
 	// payload has the hostport
-	p, _ := proxy.NewHTTPProxy(fmt.Sprintf(":%s", cliConfig.Port), string(payload), proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
+	p, err := proxy.NewHTTPProxy(fmt.Sprintf(":%s", cliConfig.Port), proxyHost, proxy.Dialer(func(ctx context.Context, n string, addr string) (net.Conn, error) {
 		logger.Infow("Dialing...", "addr", addr)
 		newChannel, err := conn.Dial("tcp", addr)
 		if err != nil {
@@ -238,15 +132,18 @@ func sshclient(logger *zap.SugaredLogger, cliConfig *config.Config) {
 
 		return newChannel, nil
 	}), logger)
+	if err != nil {
+		return err
+	}
 	l, err := p.ListenAndServe()
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
-	logger.Debug(l.Addr().String())
 	defer l.Close()
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	<-c
+	k := make(chan os.Signal, 1)
+	signal.Notify(k, os.Interrupt)
+	<-k
+	return nil
 }
 
 func loadPrivateKey(privateKeyPath string, logger *zap.SugaredLogger) (ssh.Signer, error) {

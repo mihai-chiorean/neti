@@ -16,5 +16,5 @@ services:
 
 secrets:
   id_rsa:
-    file: private_unencrypted.pem
+    file: ./.env/private_unencrypted.pem
   
