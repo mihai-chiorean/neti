@@ -3,7 +3,7 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +33,7 @@ func TestNewHTTPProxy(t *testing.T) {
 	assert.NoError(t, err)
 	res, err := http.Get("http://" + p.ListenerHost() + "/")
 	assert.NoError(t, err)
-	out, err := ioutil.ReadAll(res.Body)
+	out, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 	assert.NoError(t, res.Body.Close())
 	assert.Equal(t, "works!", string(out))

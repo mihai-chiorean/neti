@@ -63,13 +63,13 @@ func initConfig() {
 func main() {
 
 	zapCfg := zap.NewDevelopmentConfig()
-	zapCfg.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	zapCfg.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
 	lp, _ := zapCfg.Build()
 	logger := lp.Named("CLI").Sugar()
 	defer logger.Sync()
 
 	rootCmd = cmd.NewRootCmd(logger)
-	cfgFile = *(rootCmd.PersistentFlags().StringP("config", "c", ".cli.yaml", "config file (default is .cli.yaml)"))
+	cfgFile = *(rootCmd.PersistentFlags().StringP("config", "c", ".env/cli.yaml", "config file (default is .cli.yaml)"))
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,

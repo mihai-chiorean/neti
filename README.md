@@ -4,6 +4,10 @@
 
 https://en.wikipedia.org/wiki/Neti_(deity)
 
+# Description
+
+Neti is a is a tool for connecting to remote environments through an ssh bastion. The main purpose is to fake services locally while forwarding receiving requests to the remote environment. It currently supports http proxy-ing.
+
 # How to run
 
 1. You'll need to create an unencripted RSA private key `private-unencrypted.pem` that will be used by the ssh tunnel to the docker container to create `known_hosts`
@@ -48,10 +52,6 @@ https://en.wikipedia.org/wiki/Bastion_host
 
 In our case, the bastian is `sshd` listening on a known port.
 
-# DNS Server
-
-To reduce configuration friction, we want services to not have to have separate local configuraitons in their own repo for routing. To use the same configuraiton as prod, we need to understand the DNSs mapped inside the k8s cluster. One of the main challenges here is doing this mapping on local `/etc/hosts` is too much friction. However, if we can edit `/etc/hosts` one time and add an entry that points to a fake DNS server that we run, then we have control over this routing and can map the service DNSs on the fly.
-
 # Structure
 
 ## Gateway
@@ -87,7 +87,6 @@ for the client to display.
 #### `NewHTTPProxy`
 
 Lazily initializes an http proxy on the gateway side.
-
 
 ## Command line
 

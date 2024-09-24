@@ -157,7 +157,6 @@ func (p *HTTPProxy) Stop() {
 	if err := p.srv.Shutdown(context.Background()); err != nil {
 		p.log.Error(err)
 	}
-
 }
 
 // ListenerHost gets the server addr
