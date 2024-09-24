@@ -19,7 +19,7 @@ spec:
             secretName: probe-key
       containers:
         - name: neti-gateway
-          image: neti-gateway
+          image: docker.io/library/neti-gateway:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 8023

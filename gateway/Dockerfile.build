@@ -1,4 +1,22 @@
-FROM golang:latest as gateway 
+FROM golang:latest AS build-stage
+
+# Set the Current Working Directory inside the container
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Copy the source from the current directory to the Working Directory inside the container
+COPY ./ ./
+
+# Download packages
+RUN go mod download
+
+# Build the Go app
+RUN GOOS=darwin GOARCH=arm64 go build -o ./build/gateway-macos-arm64 ./gateway
+RUN GOOS=linux go build -o ./build/gateway-linux ./gateway
+
+FROM build-stage as gateway 
 
 # Update and install packages
 RUN apt-get update && \
@@ -31,21 +49,12 @@ RUN mkdir /var/run/sshd && \
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy go mod and sum files
-# COPY go.mod go.sum ./
-
 # Copy the source from the current directory to the Working Directory inside the container
 COPY ./ ./
-
+COPY --from=build-stage /app/build/gateway-macos-arm64 /bin/gateway
 # Add public key to authorized_keys file to enable pubkey auth
 RUN mkdir /home/testuser/.ssh && \
     ssh-keygen -y -f /app/.env/private_unencrypted.pem > /home/testuser/.ssh/authorized_keys
-
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
-RUN go mod download
-
-# Build the Go app
-RUN GOOS=darwin GOARCH=arm64 go build -o /bin/gateway ./gateway
 
 # Expose port 8080 to the outside world
 EXPOSE 22
@@ -55,7 +64,7 @@ EXPOSE 8022
 EXPOSE 8023
 
 # Command to run the executable
-# CMD ["/bin/gateway"]
+# RUN ["/bin/gateway"]
 
 # Start SSH server
 CMD ["/usr/sbin/sshd", "-De"]

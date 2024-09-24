@@ -19,7 +19,6 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -32,5 +31,3 @@ require (
 	golang.org/x/text v0.9.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
-
-require github.com/google/gopacket v1.1.19

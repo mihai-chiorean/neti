@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN go build -o /bin/gateway ./gateway
+RUN GOOS=darwin GOARCH=arm64 go build -o /bin/gateway ./gateway
 
 # Expose port 8080 to the outside world
 EXPOSE 22

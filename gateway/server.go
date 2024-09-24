@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"strconv"
 
@@ -309,29 +308,6 @@ func (s *Server) Listen(hostport string) (func(), error) {
 			{
 				s.handleDirectTCP(newChannel)
 				continue
-			}
-		// (mihai) NOT USED AS OF 9/16
-		case "tcpip-forward":
-			{
-				// TODO start tcp listener on random port
-				_, _, err := newChannel.Accept()
-				if err != nil {
-					logger.Error("Could not accept channel", err)
-					continue
-				}
-
-				listener, err := net.Listen("tcp", "0.0.0.0:0")
-				if err != nil {
-					logger.Error(err, "Failed to open tcp listener for proxy")
-					continue
-				}
-
-				go func(l net.Listener) {
-					http.Serve(l, http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-						resp.WriteHeader(500)
-						resp.Write([]byte(`Not the plmbing  you are looking for`))
-					}))
-				}(listener)
 			}
 		default:
 			{
